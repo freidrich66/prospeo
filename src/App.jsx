@@ -95,8 +95,16 @@ async function callClaude(messages) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages }),
   });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("Erreur serveur /api/claude:", res.status, err);
+    throw new Error("Erreur serveur " + res.status + " : " + err);
+  }
   const data = await res.json();
-  if (data.error) throw new Error(data.error);
+  if (data.error) {
+    console.error("Erreur API Anthropic:", data.error);
+    throw new Error(data.error);
+  }
   return data.content?.[0]?.text || "";
 }
 
@@ -524,17 +532,50 @@ function AddView({ profile, isMobile, notify, onAdded }) {
     try {
       const result = await callClaude([{
         role:"user",
-        content:`Extrais les informations de contact depuis ce texte dicté en français. Retourne UNIQUEMENT ce JSON (string vide si absent) :
-{"first_name":"","last_name":"","company":"","role":"","email":"","phone":"","notes":""}
-Texte : "${text}"
-Pas d'explication, juste le JSON.`
+        content:`Tu es un assistant qui extrait des informations de contact.
+Texte dicté : "${text}"
+Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
+{"first_name":"","last_name":"","company":"","role":"","email":"","phone":"","notes":""}`
       }]);
-      const parsed = JSON.parse(result.replace(/\`\`\`json|\`\`\`/g,"").trim());
-      setForm(p=>({...p,...parsed,source:"vocal"}));
-      setVocalFull(false);
-      setVocalText("");
-      notify("🎙️ Contact extrait avec succès !");
-    } catch { notify("Erreur analyse IA","error"); }
+
+      console.log("Réponse IA brute:", result);
+
+      // Parsing ultra-robuste
+      let parsed = {};
+      const clean = result
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
+        .trim();
+
+      // Essai 1 : parsing direct
+      try { parsed = JSON.parse(clean); }
+      catch {
+        // Essai 2 : extraire le premier objet JSON trouvé
+        const start = clean.indexOf("{");
+        const end   = clean.lastIndexOf("}");
+        if (start !== -1 && end !== -1) {
+          try { parsed = JSON.parse(clean.slice(start, end + 1)); }
+          catch { parsed = {}; }
+        }
+      }
+
+      // Appliquer les champs trouvés (même si partiels)
+      const fields = ["first_name","last_name","company","role","email","phone","notes"];
+      const update = {};
+      fields.forEach(k => { if (parsed[k] !== undefined) update[k] = parsed[k]; });
+
+      if (Object.keys(update).length === 0) {
+        notify("IA n'a pas trouvé d'informations dans le texte","error");
+      } else {
+        setForm(p=>({...p,...update,source:"vocal"}));
+        setVocalFull(false);
+        setVocalText("");
+        notify("🎙️ Contact extrait avec succès !");
+      }
+    } catch(err) {
+      console.error("Erreur analyse vocale:", err.message);
+      notify("Erreur : " + err.message, "error");
+    }
     setVocalAnalyzing(false);
   };
 
