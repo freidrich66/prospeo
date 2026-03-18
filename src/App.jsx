@@ -30,28 +30,42 @@ function isIOS() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 }
 
+function isIOSChrome() {
+  // CriOS = Chrome iOS user agent
+  return /CriOS/.test(navigator.userAgent);
+}
+
+function isIOSSafari() {
+  // iOS Safari = iOS but NOT Chrome, NOT Firefox
+  return isIOS() && !isIOSChrome() && !/FxiOS/.test(navigator.userAgent);
+}
+
 function isPWA() {
   return window.navigator.standalone === true ||
     window.matchMedia("(display-mode: standalone)").matches;
 }
 
 function isIOSPWA() {
+  // PWA mode = Safari WebView = no speech recognition
   return isIOS() && isPWA();
 }
 
 function openInChrome() {
   const url = window.location.href;
-  // googlechrome:// scheme opens URL directly in Chrome on iOS
-  const chromeUrl = url.replace(/^https?/, "googlechromes").replace(/^http:/, "googlechrome:");
+  const chromeUrl = url.replace(/^https/, "googlechromes").replace(/^http:/, "googlechrome:");
   window.location.href = chromeUrl;
-  // Fallback after 500ms if Chrome not installed
   setTimeout(() => {
     window.open("https://apps.apple.com/app/google-chrome/id535886823", "_blank");
   }, 500);
 }
 
 function hasSpeechRecognition() {
-  return !isIOS() && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  // Chrome iOS supporte la Web Speech API
+  // Safari iOS et PWA ne la supportent pas
+  if (isIOSPWA()) return false;
+  if (isIOSChrome()) return true;
+  if (isIOSSafari()) return false;
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 }
 
 function displayName(p) {
@@ -438,7 +452,7 @@ function AddView({ profile, isMobile, notify, onAdded }) {
       setShowPWABanner(true);
       return;
     }
-    if (isIOS()) {
+    if (isIOSSafari()) {
       const inputEl = inputRefs.current[field];
       if (inputEl) {
         inputEl.focus();
@@ -462,7 +476,7 @@ function AddView({ profile, isMobile, notify, onAdded }) {
       setShowPWABanner(true);
       return;
     }
-    if (isIOS()) {
+    if (isIOSSafari()) {
       setVocalFull(true);
       setVocalText("");
       return;
@@ -581,13 +595,13 @@ Pas d'explication, juste le JSON.`
             <div style={{ display:"flex", alignItems:"center", gap:8 }}>
               <div style={{ width:10, height:10, borderRadius:"50%", background: vocalRecRef.current ? "#FF4C1A" : "#555", animation: vocalRecRef.current ? "pulse 1s infinite" : "none" }} />
               <span style={{ fontSize:13, fontWeight:600, color:"#E8E0D4", fontFamily:"'Helvetica Neue',sans-serif" }}>
-                {isIOS() ? "Dictée vocale" : vocalRecRef.current ? "Écoute en cours..." : "Prêt à écouter"}
+                {isIOSSafari() ? "Dictée vocale" : vocalRecRef.current ? "Écoute en cours..." : "Prêt à écouter"}
               </span>
             </div>
             <button style={{ border:"none", background:"transparent", color:"#888", cursor:"pointer", fontSize:18, padding:"4px" }} onClick={()=>{ stopVocalFull(); setVocalFull(false); setVocalText(""); f("source","manuel"); }}>✕</button>
           </div>
 
-          {isIOS() ? (
+          {isIOSSafari() ? (
             <div style={{ marginBottom:14 }}>
               <p style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 10px", lineHeight:1.5 }}>
                 Dictez votre contact en une phrase, puis collez le texte ci-dessous :
