@@ -170,7 +170,7 @@ function ProspeoApp({ profile, onSignOut }) {
 
   const loadContacts = useCallback(async () => {
     setLoadingData(true);
-    let q = supabase.from("contacts").select("*, profiles(full_name,email)").order("created_at",{ascending:false});
+    let q = supabase.from("contacts").select("*, profiles:user_id(full_name,email)").order("created_at",{ascending:false});
     if (profile?.role !== "manager") q = q.eq("user_id", profile?.id);
     const { data } = await q;
     setContacts(data || []);
@@ -310,12 +310,43 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, on
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:"#1A1A1A", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.first_name} {c.last_name}</div>
                 <div style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.company||c.role}</div>
+                {profile?.role==="manager" && (
+                  <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}>
+                    👤 {c.profiles?.full_name || c.profiles?.email || "Commercial inconnu"}
+                  </div>
+                )}
               </div>
               <div style={{ ...SB, background:STATUS_COLORS[c.status]?.bg, color:STATUS_COLORS[c.status]?.text, flexShrink:0 }}>{STATUS_COLORS[c.status]?.label}</div>
             </div>
           ))
         }
       </div>
+      {profile?.role==="manager" && (
+        <div style={{ ...C, marginTop:14 }}>
+          <h3 style={CT}>Par commercial</h3>
+          {(() => {
+            const byUser = contacts.reduce((acc, c) => {
+              const name = c.profiles?.full_name || c.profiles?.email || "Inconnu";
+              if (!acc[name]) acc[name] = { total:0, chaud:0, converti:0 };
+              acc[name].total++;
+              if (c.status==="chaud") acc[name].chaud++;
+              if (c.status==="converti") acc[name].converti++;
+              return acc;
+            }, {});
+            return Object.entries(byUser).map(([name, s]) => (
+              <div key={name} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 0", borderBottom:"1px solid #F0EBE0" }}>
+                <div style={{ width:34, height:34, borderRadius:"50%", background:"#FF4C1A", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", flexShrink:0 }}>{name[0]}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:600, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>{name}</div>
+                  <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{s.total} prospect{s.total>1?"s":""} · {s.chaud} chaud{s.chaud>1?"s":""} · {s.converti} converti{s.converti>1?"s":""}</div>
+                </div>
+                <div style={{ fontSize:18, fontWeight:700, color:"#1A1A1A", fontFamily:"'Helvetica Neue',sans-serif" }}>{s.total}</div>
+              </div>
+            ));
+          })()}
+        </div>
+      )}
+
       <div style={{ ...C, marginTop:14 }}>
         <h3 style={CT}>Actions rapides</h3>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
@@ -335,8 +366,12 @@ function AddView({ profile, isMobile, notify, onAdded }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [rec, setRec]             = useState(false);
   const [recF, setRecF]           = useState(null);
+  const [vocalFull, setVocalFull] = useState(false);
+  const [vocalText, setVocalText] = useState("");
+  const [vocalAnalyzing, setVocalAnalyzing] = useState(false);
   const fileRef = useRef(null);
   const recRef  = useRef(null);
+  const vocalRecRef = useRef(null);
   const f = (k,v) => setForm(p=>({...p,[k]:v}));
 
   const submit = async () => {
@@ -386,6 +421,52 @@ function AddView({ profile, isMobile, notify, onAdded }) {
   };
   const stopVoice = () => { recRef.current?.stop(); setRec(false); setRecF(null); };
 
+  const startVocalFull = () => {
+    f("source","vocal");
+    if (isIOS()) {
+      setVocalFull(true);
+      setVocalText("");
+      return;
+    }
+    const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
+    if (!SR) { setVocalFull(true); setVocalText(""); return; }
+    const r = new SR(); r.lang="fr-FR"; r.interimResults=true; r.continuous=false;
+    r.onresult = e => {
+      const transcript = Array.from(e.results).map(res=>res[0].transcript).join(" ");
+      setVocalText(transcript);
+    };
+    r.onend = () => { vocalRecRef.current = null; };
+    r.onerror = () => { vocalRecRef.current = null; notify("Erreur micro","error"); };
+    vocalRecRef.current = r;
+    r.start();
+    setVocalFull(true);
+    setVocalText("");
+  };
+
+  const stopVocalFull = () => {
+    if (vocalRecRef.current) { vocalRecRef.current.stop(); vocalRecRef.current = null; }
+  };
+
+  const analyzeVocalText = async (text) => {
+    if (!text.trim()) { notify("Aucun texte à analyser","error"); return; }
+    setVocalAnalyzing(true);
+    try {
+      const result = await callClaude([{
+        role:"user",
+        content:`Extrais les informations de contact depuis ce texte dicté en français. Retourne UNIQUEMENT ce JSON (string vide si absent) :
+{"first_name":"","last_name":"","company":"","role":"","email":"","phone":"","notes":""}
+Texte : "${text}"
+Pas d'explication, juste le JSON.`
+      }]);
+      const parsed = JSON.parse(result.replace(/\`\`\`json|\`\`\`/g,"").trim());
+      setForm(p=>({...p,...parsed,source:"vocal"}));
+      setVocalFull(false);
+      setVocalText("");
+      notify("🎙️ Contact extrait avec succès !");
+    } catch { notify("Erreur analyse IA","error"); }
+    setVocalAnalyzing(false);
+  };
+
   const FIELDS = [
     { k:"first_name", l:"Prénom *",   ph:"Jean"                 },
     { k:"last_name",  l:"Nom *",      ph:"Dupont"               },
@@ -401,13 +482,77 @@ function AddView({ profile, isMobile, notify, onAdded }) {
       <div style={{ display:"flex", gap:8, marginBottom:22, flexWrap:"wrap" }}>
         {[{id:"manuel",icon:"✏️",label:"Manuel"},{id:"carte",icon:"📇",label:"Carte IA"},{id:"vocal",icon:"🎙️",label:"Vocal"}].map(src=>(
           <button key={src.id} style={{ display:"flex", alignItems:"center", gap:6, padding:isMobile?"9px 13px":"10px 18px", border:`2px solid ${form.source===src.id?"#1A1A1A":"#E8E0D4"}`, borderRadius:30, background:form.source===src.id?"#1A1A1A":"transparent", color:form.source===src.id?"#E8E0D4":"#888", cursor:"pointer", fontSize:13, fontFamily:"'Helvetica Neue',sans-serif" }}
-            onClick={()=>{ f("source",src.id); if(src.id==="carte") fileRef.current?.click(); }}>
+            onClick={()=>{
+              if(src.id==="carte") { f("source","carte"); fileRef.current?.click(); }
+              else if(src.id==="vocal") { startVocalFull(); }
+              else { f("source","manuel"); }
+            }}>
             <span>{src.icon}</span><span>{src.label}</span>
           </button>
         ))}
       </div>
       <input ref={fileRef} type="file" accept="image/*" style={{ display:"none" }} onChange={scanCard} />
       {analyzing && <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 18px", background:"#FFF8F4", border:"2px solid #FF4C1A", borderRadius:10, marginBottom:18, fontFamily:"'Helvetica Neue',sans-serif", fontSize:13, color:"#FF4C1A" }}><div style={{ width:16, height:16, border:"3px solid #FFD4C4", borderTopColor:"#FF4C1A", borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /><span>Analyse IA...</span></div>}
+
+      {vocalFull && (
+        <div style={{ background:"#1A1A1A", borderRadius:16, padding:20, marginBottom:20 }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <div style={{ width:10, height:10, borderRadius:"50%", background: vocalRecRef.current ? "#FF4C1A" : "#555", animation: vocalRecRef.current ? "pulse 1s infinite" : "none" }} />
+              <span style={{ fontSize:13, fontWeight:600, color:"#E8E0D4", fontFamily:"'Helvetica Neue',sans-serif" }}>
+                {isIOS() ? "Dictée vocale" : vocalRecRef.current ? "Écoute en cours..." : "Prêt à écouter"}
+              </span>
+            </div>
+            <button style={{ border:"none", background:"transparent", color:"#888", cursor:"pointer", fontSize:18, padding:"4px" }} onClick={()=>{ stopVocalFull(); setVocalFull(false); setVocalText(""); f("source","manuel"); }}>✕</button>
+          </div>
+
+          {isIOS() ? (
+            <div style={{ marginBottom:14 }}>
+              <p style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 10px", lineHeight:1.5 }}>
+                Dictez votre contact en une phrase, puis collez le texte ci-dessous :
+              </p>
+              <p style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 10px", lineHeight:1.5, fontStyle:"italic" }}>
+                Exemple : "Jean Dupont, directeur commercial chez Acme, jean@acme.fr, 06 12 34 56 78"
+              </p>
+              <textarea
+                style={{ width:"100%", padding:"10px 12px", border:"1.5px solid #333", borderRadius:10, background:"#2A2A2A", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", color:"#E8E0D4", minHeight:70, resize:"none", boxSizing:"border-box", outline:"none" }}
+                placeholder="Collez ou tapez ici le texte dicté..."
+                value={vocalText}
+                onChange={e=>setVocalText(e.target.value)}
+              />
+            </div>
+          ) : (
+            <div style={{ marginBottom:14 }}>
+              <p style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 8px", fontStyle:"italic" }}>
+                Exemple : "Jean Dupont, directeur commercial chez Acme, jean@acme.fr, 06 12 34 56 78"
+              </p>
+              {!vocalRecRef.current ? (
+                <button style={{ width:"100%", padding:"12px", background:"#FF4C1A", color:"#fff", border:"none", borderRadius:10, cursor:"pointer", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, marginBottom:8 }}
+                  onClick={startVocalFull}>
+                  🎙️ Appuyer pour dicter
+                </button>
+              ) : (
+                <button style={{ width:"100%", padding:"12px", background:"#333", color:"#E8E0D4", border:"2px solid #FF4C1A", borderRadius:10, cursor:"pointer", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, marginBottom:8 }}
+                  onClick={stopVocalFull}>
+                  ⏹ Arrêter la dictée
+                </button>
+              )}
+              {vocalText && (
+                <div style={{ padding:"10px 12px", background:"#2A2A2A", borderRadius:8, fontSize:13, color:"#E8E0D4", fontFamily:"'Helvetica Neue',sans-serif", lineHeight:1.5 }}>
+                  "{vocalText}"
+                </div>
+              )}
+            </div>
+          )}
+
+          <button
+            style={{ width:"100%", padding:"12px", background: vocalText.trim() ? "#FF4C1A" : "#333", color: vocalText.trim() ? "#fff" : "#666", border:"none", borderRadius:10, cursor: vocalText.trim() ? "pointer" : "default", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
+            onClick={()=>analyzeVocalText(vocalText)}
+            disabled={!vocalText.trim()||vocalAnalyzing}>
+            {vocalAnalyzing ? <span style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}><div style={{ width:14, height:14, border:"2px solid rgba(255,255,255,0.3)", borderTopColor:"#fff", borderRadius:"50%", animation:"spin 0.8s linear infinite" }} />Analyse IA en cours...</span> : "✨ Extraire les informations"}
+          </button>
+        </div>
+      )}
 
       <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:13, marginBottom:13 }}>
         {FIELDS.map(field=>(
@@ -530,7 +675,11 @@ function DetailView({ contact:c, profile, isMobile, onBack, onStatusUpdate, onDe
           <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
             <div style={{ ...SB, background:STATUS_COLORS[c.status]?.bg, color:STATUS_COLORS[c.status]?.text }}>{STATUS_COLORS[c.status]?.label}</div>
             <div style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", alignSelf:"center" }}>{SOURCE_ICONS[c.source]} {c.source}</div>
-            {profile?.role==="manager" && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", alignSelf:"center" }}>👤 {c.profiles?.full_name}</div>}
+            {profile?.role==="manager" && c.profiles?.full_name && (
+          <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 10px", background:"#FFF4EE", borderRadius:20 }}>
+            <span style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}>👤 {c.profiles.full_name}</span>
+          </div>
+        )}
           </div>
         </div>
       </div>
@@ -579,8 +728,14 @@ function ReportView({ contacts, profile, isMobile, notify }) {
   const [preview, setPreview] = useState(false);
   const [sending, setSending] = useState(false);
 
+  const [filterUser, setFilterUser] = useState("all");
   const { start, end } = getPeriodRange(period, cs, ce);
-  const filtered = contacts.filter(c=>{ if (!start) return true; const d=new Date(c.created_at); return d>=start&&d<=end; });
+  const filtered = contacts.filter(c=>{
+    const matchPeriod = !start || (new Date(c.created_at)>=start && new Date(c.created_at)<=end);
+    const matchUser = filterUser==="all" || (c.profiles?.full_name||c.profiles?.email||"Inconnu")===filterUser;
+    return matchPeriod && matchUser;
+  });
+  const allUsers = profile?.role==="manager" ? [...new Set(contacts.map(c=>c.profiles?.full_name||c.profiles?.email||"Inconnu"))] : [];
 
   const stats = {
     total:    filtered.length,
@@ -613,6 +768,20 @@ function ReportView({ contacts, profile, isMobile, notify }) {
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
           <div><label style={L}>Du</label><input type="date" style={I} value={cs} onChange={e=>setCs(e.target.value)} /></div>
           <div><label style={L}>Au</label><input type="date" style={I} value={ce} onChange={e=>setCe(e.target.value)} /></div>
+        </div>
+      )}
+
+      {profile?.role==="manager" && allUsers.length > 0 && (
+        <div style={{ marginBottom:14 }}>
+          <label style={L}>Filtrer par commercial</label>
+          <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:6 }}>
+            <button style={{ padding:"6px 12px", border:`2px solid ${filterUser==="all"?"#1A1A1A":"#E8E0D4"}`, borderRadius:20, background:filterUser==="all"?"#1A1A1A":"transparent", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:filterUser==="all"?"#E8E0D4":"#888" }}
+              onClick={()=>setFilterUser("all")}>Tous</button>
+            {allUsers.map(u=>(
+              <button key={u} style={{ padding:"6px 12px", border:`2px solid ${filterUser===u?"#FF4C1A":"#E8E0D4"}`, borderRadius:20, background:filterUser===u?"#FF4C1A":"transparent", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:filterUser===u?"#fff":"#888" }}
+                onClick={()=>setFilterUser(u)}>👤 {u}</button>
+            ))}
+          </div>
         </div>
       )}
 
