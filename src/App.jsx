@@ -34,6 +34,14 @@ function hasSpeechRecognition() {
   return !isIOS() && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 }
 
+function displayName(p) {
+  if (!p) return "Inconnu";
+  if (p.first_name && p.last_name) return `${p.first_name} ${p.last_name}`;
+  if (p.full_name) return p.full_name;
+  if (p.email) return p.email;
+  return "Commercial";
+}
+
 function getPeriodRange(periodId, customStart, customEnd) {
   const now   = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -204,6 +212,7 @@ function ProspeoApp({ profile, onSignOut }) {
     { id:"add",       icon:"＋", label:"Ajouter"   },
     { id:"list",      icon:"≡", label:"Prospects"  },
     { id:"report",    icon:"◉", label:"Rapports"   },
+    { id:"profile",   icon:"👤", label:"Mon profil" },
   ];
 
   const go = (id) => setView(id);
@@ -227,7 +236,7 @@ function ProspeoApp({ profile, onSignOut }) {
           <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 24px 14px", borderBottom:"1px solid #2A2A2A", marginBottom:8 }}>
             <div style={{ width:34, height:34, borderRadius:"50%", background:"#FF4C1A", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", flexShrink:0 }}>{profile?.full_name?.[0]||"?"}</div>
             <div>
-              <div style={{ fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#E8E0D4", fontWeight:600, maxWidth:140, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{profile?.full_name||profile?.email}</div>
+              <div style={{ fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#E8E0D4", fontWeight:600, maxWidth:140, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{displayName(profile)}</div>
               <div style={{ fontSize:10, color:profile?.role==="manager"?"#FF4C1A":"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{profile?.role==="manager"?"👑 Manager":"Commercial"}</div>
             </div>
           </div>
@@ -256,7 +265,7 @@ function ProspeoApp({ profile, onSignOut }) {
             <span style={{ fontSize:15, fontWeight:700, letterSpacing:3, color:"#E8E0D4", fontFamily:"'Helvetica Neue',sans-serif" }}>PROSPEO</span>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <span style={{ fontSize:11, color:profile?.role==="manager"?"#FF4C1A":"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{profile?.role==="manager"?"👑 ":""}{profile?.full_name?.split(" ")[0]}</span>
+            <span style={{ fontSize:11, color:profile?.role==="manager"?"#FF4C1A":"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{profile?.role==="manager"?"👑 ":""}{profile?.first_name || profile?.full_name?.split(" ")[0] || profile?.email?.split("@")[0]}</span>
             <button style={{ background:"transparent", border:"none", color:"#888", cursor:"pointer", fontSize:18, padding:"4px 6px" }} onClick={onSignOut}>⎋</button>
           </div>
         </div>
@@ -269,6 +278,7 @@ function ProspeoApp({ profile, onSignOut }) {
         {view==="list"      && <ListView contacts={contacts} profile={profile} loadingData={loadingData} isMobile={isMobile} onSelect={c=>{setSelected(c);setView("detail");}} onAdd={()=>go("add")} />}
         {view==="detail" && selected && <DetailView contact={selected} profile={profile} isMobile={isMobile} onBack={()=>setView("list")} onStatusUpdate={handleStatusUpdate} onDelete={handleDelete} notify={notify} />}
         {view==="report"    && <ReportView contacts={contacts} profile={profile} isMobile={isMobile} notify={notify} />}
+        {view==="profile"   && <ProfileView profile={profile} isMobile={isMobile} notify={notify} onUpdated={(p)=>{ setProfile(p); }} />}
       </main>
 
       {/* Mobile bottom nav */}
@@ -312,7 +322,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, on
                 <div style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.company||c.role}</div>
                 {profile?.role==="manager" && (
                   <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}>
-                    👤 {c.profiles?.full_name || c.profiles?.email || "Commercial inconnu"}
+                    👤 {displayName(c.profiles)}
                   </div>
                 )}
               </div>
@@ -326,7 +336,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, on
           <h3 style={CT}>Par commercial</h3>
           {(() => {
             const byUser = contacts.reduce((acc, c) => {
-              const name = c.profiles?.full_name || c.profiles?.email || "Inconnu";
+              const name = displayName(c.profiles);
               if (!acc[name]) acc[name] = { total:0, chaud:0, converti:0 };
               acc[name].total++;
               if (c.status==="chaud") acc[name].chaud++;
@@ -732,7 +742,7 @@ function ReportView({ contacts, profile, isMobile, notify }) {
   const { start, end } = getPeriodRange(period, cs, ce);
   const filtered = contacts.filter(c=>{
     const matchPeriod = !start || (new Date(c.created_at)>=start && new Date(c.created_at)<=end);
-    const matchUser = filterUser==="all" || (c.profiles?.full_name||c.profiles?.email||"Inconnu")===filterUser;
+    const matchUser = filterUser==="all" || displayName(c.profiles)===filterUser;
     return matchPeriod && matchUser;
   });
   const allUsers = profile?.role==="manager" ? [...new Set(contacts.map(c=>c.profiles?.full_name||c.profiles?.email||"Inconnu"))] : [];
@@ -841,6 +851,91 @@ function ReportView({ contacts, profile, isMobile, notify }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ProfileView({ profile, isMobile, notify, onUpdated }) {
+  const [form, setForm] = useState({
+    first_name: profile?.first_name || "",
+    last_name:  profile?.last_name  || "",
+    company:    profile?.company    || "",
+    phone:      profile?.phone      || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const f = (k,v) => setForm(p=>({...p,[k]:v}));
+
+  const save = async () => {
+    setSaving(true);
+    const full_name = [form.first_name, form.last_name].filter(Boolean).join(" ") || profile?.full_name || "";
+    const { data, error } = await supabase
+      .from("profiles")
+      .update({ ...form, full_name })
+      .eq("id", profile.id)
+      .select()
+      .single();
+    if (error) { notify("Erreur sauvegarde","error"); }
+    else { notify("✅ Profil mis à jour !"); onUpdated({ ...profile, ...data }); }
+    setSaving(false);
+  };
+
+  return (
+    <div style={P(isMobile)}>
+      <div style={{ marginBottom:22 }}>
+        <h1 style={T(isMobile)}>Mon profil</h1>
+        <p style={Sub}>Vos informations personnelles</p>
+      </div>
+
+      {/* Avatar + infos de base */}
+      <div style={{ ...C, marginBottom:16, display:"flex", alignItems:"center", gap:16 }}>
+        <div style={{ width:56, height:56, borderRadius:"50%", background:"#FF4C1A", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", flexShrink:0 }}>
+          {(form.first_name||profile?.full_name||"?")[0].toUpperCase()}
+        </div>
+        <div>
+          <div style={{ fontSize:16, fontWeight:600, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>
+            {[form.first_name, form.last_name].filter(Boolean).join(" ") || profile?.full_name || "Nouveau commercial"}
+          </div>
+          <div style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>{profile?.email}</div>
+          <div style={{ marginTop:6 }}>
+            <span style={{ fontSize:11, fontWeight:700, padding:"2px 10px", borderRadius:20, background: profile?.role==="manager"?"#FF4C1A":"#1A1A1A", color:"#fff", fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5 }}>
+              {profile?.role==="manager"?"👑 Manager":"Commercial"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Formulaire */}
+      <div style={C}>
+        <h3 style={CT}>Informations personnelles</h3>
+        <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:14 }}>
+          <div>
+            <label style={L}>Prénom</label>
+            <input style={I} placeholder="Jean" value={form.first_name} onChange={e=>f("first_name",e.target.value)} />
+          </div>
+          <div>
+            <label style={L}>Nom</label>
+            <input style={I} placeholder="Dupont" value={form.last_name} onChange={e=>f("last_name",e.target.value)} />
+          </div>
+          <div>
+            <label style={L}>Société</label>
+            <input style={I} placeholder="Acme Corp" value={form.company} onChange={e=>f("company",e.target.value)} />
+          </div>
+          <div>
+            <label style={L}>Téléphone</label>
+            <input style={I} placeholder="+33 6 00 00 00 00" value={form.phone} onChange={e=>f("phone",e.target.value)} />
+          </div>
+        </div>
+
+        <div style={{ marginTop:16, padding:"12px 14px", background:"#F5F0E8", borderRadius:10 }}>
+          <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, textTransform:"uppercase", letterSpacing:1, marginBottom:4 }}>Email</div>
+          <div style={{ fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", color:"#aaa" }}>{profile?.email}</div>
+          <div style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>L'email ne peut pas être modifié</div>
+        </div>
+
+        <button style={{ ...BP, width:"100%", marginTop:16, padding:"14px" }} onClick={save} disabled={saving}>
+          {saving ? "Sauvegarde..." : "Enregistrer mon profil"}
+        </button>
+      </div>
     </div>
   );
 }
