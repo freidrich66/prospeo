@@ -910,13 +910,37 @@ function ReportView({ contacts, profile, isMobile, notify }) {
 
 function ProfileView({ profile, isMobile, notify, onUpdated }) {
   const [form, setForm] = useState({
-    first_name: profile?.first_name || "",
-    last_name:  profile?.last_name  || "",
-    company:    profile?.company    || "",
-    phone:      profile?.phone      || "",
+    first_name: "",
+    last_name:  "",
+    company:    "",
+    phone:      "",
   });
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const [loading, setLoading] = useState(true);
   const f = (k,v) => setForm(p=>({...p,[k]:v}));
+
+  // Recharge depuis Supabase à chaque fois que l'onglet est ouvert
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", profile.id)
+        .single();
+      if (data) {
+        setForm({
+          first_name: data.first_name || "",
+          last_name:  data.last_name  || "",
+          company:    data.company    || "",
+          phone:      data.phone      || "",
+        });
+        onUpdated({ ...profile, ...data });
+      }
+      setLoading(false);
+    };
+    load();
+  }, [profile.id]);
 
   const save = async () => {
     setSaving(true);
@@ -931,6 +955,8 @@ function ProfileView({ profile, isMobile, notify, onUpdated }) {
     else { notify("✅ Profil mis à jour !"); onUpdated({ ...profile, ...data }); }
     setSaving(false);
   };
+
+  if (loading) return <div style={{ ...P(isMobile), textAlign:"center", paddingTop:60 }}><div style={{ fontSize:32, color:"#FF4C1A", marginBottom:10 }}>◈</div><div style={{ fontFamily:"'Helvetica Neue',sans-serif", color:"#888" }}>Chargement...</div></div>;
 
   return (
     <div style={P(isMobile)}>
