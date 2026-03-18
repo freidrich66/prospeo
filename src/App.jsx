@@ -30,6 +30,26 @@ function isIOS() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 }
 
+function isPWA() {
+  return window.navigator.standalone === true ||
+    window.matchMedia("(display-mode: standalone)").matches;
+}
+
+function isIOSPWA() {
+  return isIOS() && isPWA();
+}
+
+function openInChrome() {
+  const url = window.location.href;
+  // googlechrome:// scheme opens URL directly in Chrome on iOS
+  const chromeUrl = url.replace(/^https?/, "googlechromes").replace(/^http:/, "googlechrome:");
+  window.location.href = chromeUrl;
+  // Fallback after 500ms if Chrome not installed
+  setTimeout(() => {
+    window.open("https://apps.apple.com/app/google-chrome/id535886823", "_blank");
+  }, 500);
+}
+
 function hasSpeechRecognition() {
   return !isIOS() && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 }
@@ -379,6 +399,7 @@ function AddView({ profile, isMobile, notify, onAdded }) {
   const [vocalFull, setVocalFull] = useState(false);
   const [vocalText, setVocalText] = useState("");
   const [vocalAnalyzing, setVocalAnalyzing] = useState(false);
+  const [showPWABanner, setShowPWABanner] = useState(false);
   const fileRef = useRef(null);
   const recRef  = useRef(null);
   const vocalRecRef = useRef(null);
@@ -413,6 +434,10 @@ function AddView({ profile, isMobile, notify, onAdded }) {
   const inputRefs = useRef({});
 
   const startVoice = (field) => {
+    if (isIOSPWA()) {
+      setShowPWABanner(true);
+      return;
+    }
     if (isIOS()) {
       const inputEl = inputRefs.current[field];
       if (inputEl) {
@@ -433,6 +458,10 @@ function AddView({ profile, isMobile, notify, onAdded }) {
 
   const startVocalFull = () => {
     f("source","vocal");
+    if (isIOSPWA()) {
+      setShowPWABanner(true);
+      return;
+    }
     if (isIOS()) {
       setVocalFull(true);
       setVocalText("");
@@ -489,6 +518,30 @@ Pas d'explication, juste le JSON.`
   return (
     <div style={P(isMobile)}>
       <h1 style={T(isMobile)}>Nouveau prospect</h1>
+      {showPWABanner && (
+        <div style={{ background:"#1A1A1A", borderRadius:16, padding:20, marginBottom:20 }}>
+          <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:12 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <span style={{ fontSize:20 }}>🎙️</span>
+              <span style={{ fontSize:14, fontWeight:600, color:"#E8E0D4", fontFamily:"'Helvetica Neue',sans-serif" }}>Vocal non disponible</span>
+            </div>
+            <button style={{ border:"none", background:"transparent", color:"#888", cursor:"pointer", fontSize:18, padding:"0 0 0 8px" }} onClick={()=>setShowPWABanner(false)}>✕</button>
+          </div>
+          <p style={{ fontSize:13, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 16px", lineHeight:1.6 }}>
+            La dictée vocale n'est pas disponible depuis l'app raccourci iPhone. Elle fonctionne uniquement dans <strong style={{ color:"#E8E0D4" }}>Google Chrome</strong>.
+          </p>
+          <button
+            style={{ width:"100%", padding:"13px", background:"#FF4C1A", color:"#fff", border:"none", borderRadius:10, cursor:"pointer", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}
+            onClick={openInChrome}>
+            <span>🌐</span>
+            <span>Ouvrir dans Chrome</span>
+          </button>
+          <p style={{ fontSize:11, color:"#555", fontFamily:"'Helvetica Neue',sans-serif", margin:"10px 0 0", textAlign:"center", lineHeight:1.5 }}>
+            Si Chrome n'est pas installé, téléchargez-le depuis l'App Store
+          </p>
+        </div>
+      )}
+
       <div style={{ display:"flex", gap:8, marginBottom:22, flexWrap:"wrap" }}>
         {[{id:"manuel",icon:"✏️",label:"Manuel"},{id:"carte",icon:"📇",label:"Carte IA"},{id:"vocal",icon:"🎙️",label:"Vocal"}].map(src=>(
           <button key={src.id} style={{ display:"flex", alignItems:"center", gap:6, padding:isMobile?"9px 13px":"10px 18px", border:`2px solid ${form.source===src.id?"#1A1A1A":"#E8E0D4"}`, borderRadius:30, background:form.source===src.id?"#1A1A1A":"transparent", color:form.source===src.id?"#E8E0D4":"#888", cursor:"pointer", fontSize:13, fontFamily:"'Helvetica Neue',sans-serif" }}
