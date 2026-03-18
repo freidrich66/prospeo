@@ -26,6 +26,14 @@ function useIsMobile() {
   return isMobile;
 }
 
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+
+function hasSpeechRecognition() {
+  return !isIOS() && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+
 function getPeriodRange(periodId, customStart, customEnd) {
   const now   = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -357,12 +365,22 @@ function AddView({ profile, isMobile, notify, onAdded }) {
     reader.readAsDataURL(file);
   };
 
+  const inputRefs = useRef({});
+
   const startVoice = (field) => {
+    if (isIOS()) {
+      const inputEl = inputRefs.current[field];
+      if (inputEl) {
+        inputEl.focus();
+        notify("🎙️ Appuyez sur le micro de votre clavier iOS");
+      }
+      return;
+    }
     const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
-    if (!SR) { notify("Vocal: utilisez Chrome","error"); return; }
+    if (!SR) { notify("Vocal non supporté sur cet appareil","error"); return; }
     const r = new SR(); r.lang="fr-FR"; r.interimResults=false;
     r.onresult = e => { const t=e.results[0][0].transcript; f(field, form[field]?form[field]+" "+t:t); setRec(false); setRecF(null); notify(`🎙️ "${t}"`); };
-    r.onerror = ()=>{ setRec(false); setRecF(null); };
+    r.onerror = ()=>{ setRec(false); setRecF(null); notify("Erreur micro","error"); };
     r.onend   = ()=>{ setRec(false); setRecF(null); };
     recRef.current=r; r.start(); setRec(true); setRecF(field);
   };
@@ -396,7 +414,7 @@ function AddView({ profile, isMobile, notify, onAdded }) {
           <div key={field.k}>
             <label style={L}>{field.l}</label>
             <div style={{ display:"flex", gap:8 }}>
-              <input style={I} placeholder={field.ph} value={form[field.k]} onChange={e=>f(field.k,e.target.value)} />
+              <input ref={el=>inputRefs.current[field.k]=el} style={I} placeholder={field.ph} value={form[field.k]} onChange={e=>f(field.k,e.target.value)} />
               <button style={{ width:43, height:43, border:`2px solid ${rec&&recF===field.k?"#FF4C1A":"#E8E0D4"}`, borderRadius:8, background:rec&&recF===field.k?"#FF4C1A":"#fff", cursor:"pointer", fontSize:15, flexShrink:0 }}
                 onClick={()=>rec&&recF===field.k?stopVoice():startVoice(field.k)}>
                 {rec&&recF===field.k?"⏹":"🎙️"}
@@ -412,7 +430,7 @@ function AddView({ profile, isMobile, notify, onAdded }) {
           <textarea style={{ ...I, minHeight:85, resize:"vertical" }} placeholder="Besoins, contexte, prochaines étapes..." value={form.notes} onChange={e=>f("notes",e.target.value)} />
           <button style={{ width:43, height:43, border:`2px solid ${rec&&recF==="notes"?"#FF4C1A":"#E8E0D4"}`, borderRadius:8, background:rec&&recF==="notes"?"#FF4C1A":"#fff", cursor:"pointer", fontSize:15, flexShrink:0, alignSelf:"flex-start" }}
             onClick={()=>rec&&recF==="notes"?stopVoice():startVoice("notes")}>
-            {rec&&recF==="notes"?"⏹":"🎙️"}
+            🎙️
           </button>
         </div>
       </div>
