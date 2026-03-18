@@ -486,6 +486,24 @@ function AddView({ profile, isMobile, notify, onAdded }) {
     if (vocalRecRef.current) { vocalRecRef.current.stop(); vocalRecRef.current = null; }
   };
 
+  const startRecording = () => {
+    const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
+    if (!SR) { notify("Vocal non supporté","error"); return; }
+    const r = new SR(); r.lang="fr-FR"; r.interimResults=true; r.continuous=false;
+    r.onresult = e => {
+      const transcript = Array.from(e.results).map(res=>res[0].transcript).join(" ");
+      setVocalText(transcript);
+    };
+    r.onend = () => { vocalRecRef.current = null; };
+    r.onerror = (err) => {
+      vocalRecRef.current = null;
+      if (err.error === "not-allowed") notify("Autorisez le micro dans Chrome","error");
+      else notify("Erreur micro : "+err.error,"error");
+    };
+    vocalRecRef.current = r;
+    r.start();
+  };
+
   const analyzeVocalText = async (text) => {
     if (!text.trim()) { notify("Aucun texte à analyser","error"); return; }
     setVocalAnalyzing(true);
@@ -591,7 +609,7 @@ Pas d'explication, juste le JSON.`
               </p>
               {!vocalRecRef.current ? (
                 <button style={{ width:"100%", padding:"12px", background:"#FF4C1A", color:"#fff", border:"none", borderRadius:10, cursor:"pointer", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, marginBottom:8 }}
-                  onClick={startVocalFull}>
+                  onClick={startRecording}>
                   🎙️ Appuyer pour dicter
                 </button>
               ) : (
