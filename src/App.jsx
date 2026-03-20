@@ -961,7 +961,7 @@ function DetailView({ contact:initialContact, profile, isMobile, onBack, onStatu
         )}
           </div>
         </div>
-      </div>
+      </div>}
 
       <div style={{ ...C, marginBottom:14 }}>
         <label style={L}>Modifier le statut</label>
