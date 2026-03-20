@@ -55,7 +55,7 @@ function openInChrome() {
   const chromeUrl = url.replace(/^https/, "googlechromes").replace(/^http:/, "googlechrome:");
   window.location.href = chromeUrl;
   setTimeout(() => {
-    window.open("https://apps.apple.com/app/google-chrome/id535886823", "_blank");
+    window.open("https://apps.apple.com/app/google-chrome/id559886823", "_blank");
   }, 500);
 }
 
@@ -66,6 +66,11 @@ function hasSpeechRecognition() {
   if (isIOSChrome()) return true;
   if (isIOSSafari()) return false;
   return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+
+const SUPER_EMAIL = "fanne@lafitel.eu";
+function isSuperManager(profile) {
+  return profile?.email === SUPER_EMAIL;
 }
 
 function displayName(p) {
@@ -209,14 +214,32 @@ function AuthPage() {
 }
 
 function ProspeoApp({ profile, onSignOut }) {
-  const [contacts, setContacts]       = useState([]);
-  const [view, setView]               = useState("dashboard");
-  const [selected, setSelected]       = useState(null);
-  const [notif, setNotif]             = useState(null);
-  const [loadingData, setLoadingData] = useState(true);
+  const [contacts, setContacts]         = useState([]);
+  const [view, setView]                 = useState("dashboard");
+  const [selected, setSelected]         = useState(null);
+  const [notif, setNotif]               = useState(null);
+  const [loadingData, setLoadingData]   = useState(true);
+  const [subscription, setSubscription] = useState(null);
   const isMobile = useIsMobile();
 
   const notify = (msg, type="success") => { setNotif({msg,type}); setTimeout(()=>setNotif(null),3000); };
+
+  const loadSubscription = useCallback(async () => {
+    if (!profile || profile.role === "manager") return;
+    try {
+      const res = await fetch("/api/subscription-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: profile.id }),
+      });
+      const data = await res.json();
+      if (data.subscription) setSubscription(data.subscription);
+    } catch (err) {
+      console.error("Erreur chargement abonnement:", err);
+    }
+  }, [profile]);
+
+  useEffect(() => { if (profile) loadSubscription(); }, [profile, loadSubscription]);
 
   const loadContacts = useCallback(async () => {
     setLoadingData(true);
@@ -250,11 +273,14 @@ function ProspeoApp({ profile, onSignOut }) {
   };
 
   const NAV = [
-    { id:"dashboard", icon:"▦", label:"Accueil"   },
-    { id:"add",       icon:"＋", label:"Ajouter"   },
-    { id:"list",      icon:"≡", label:"Prospects"  },
-    { id:"report",    icon:"◉", label:"Rapports"   },
-    { id:"profile",   icon:"👤", label:"Mon profil" },
+    { id:"dashboard",     icon:"▦", label:"Accueil"      },
+    { id:"add",           icon:"＋", label:"Ajouter"      },
+    { id:"list",          icon:"≡", label:"Prospects"     },
+    { id:"report",        icon:"◉", label:"Rapports"      },
+    { id:"profile",       icon:"👤", label:"Mon profil"   },
+    { id:"crm",           icon:"🔗", label:"CRM"           },
+    ...(profile?.role !== "manager" ? [{ id:"subscription", icon:"⭐", label:"Abonnement" }] : []),
+    ...(isSuperManager(profile) ? [{ id:"superadmin", icon:"🔐", label:"Super Admin" }] : []),
   ];
 
   const go = (id) => setView(id);
@@ -320,7 +346,11 @@ function ProspeoApp({ profile, onSignOut }) {
         {view==="list"      && <ListView contacts={contacts} profile={profile} loadingData={loadingData} isMobile={isMobile} onSelect={c=>{setSelected(c);setView("detail");}} onAdd={()=>go("add")} />}
         {view==="detail" && selected && <DetailView contact={selected} profile={profile} isMobile={isMobile} onBack={()=>setView("list")} onStatusUpdate={handleStatusUpdate} onDelete={handleDelete} notify={notify} />}
         {view==="report"    && <ReportView contacts={contacts} profile={profile} isMobile={isMobile} notify={notify} />}
-        {view==="profile"   && <ProfileView profile={profile} isMobile={isMobile} notify={notify} onUpdated={(p)=>{ setProfile(p); }} />}
+        {view==="profile"       && <ProfileView profile={profile} isMobile={isMobile} notify={notify} onUpdated={(p)=>{ setProfile(p); }} />}
+        {view==="subscription"  && <SubscriptionView profile={profile} subscription={subscription} isMobile={isMobile} notify={notify} onActivated={loadSubscription} />}
+        {view==="activate"      && <ActivateKeyView profile={profile} isMobile={isMobile} notify={notify} onActivated={()=>{ loadSubscription(); setView("dashboard"); }} />}
+        {view==="superadmin" && isSuperManager(profile) && <SuperAdminView profile={profile} isMobile={isMobile} notify={notify} />}
+        {view==="crm"         && <CRMConfigView profile={profile} isMobile={isMobile} notify={notify} />}
       </main>
 
       {/* Mobile bottom nav */}
@@ -345,6 +375,37 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, on
         <h1 style={T(isMobile)}>Tableau de bord</h1>
         <p style={Sub}>{new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</p>
       </div>
+
+      {profile?.role !== "manager" && subscription && (() => {
+        const now = new Date();
+        const trialEnd = subscription.trial_ends_at ? new Date(subscription.trial_ends_at) : null;
+        const daysLeft = trialEnd ? Math.ceil((trialEnd - now) / 86400000) : 0;
+        if (subscription.status === "expired") return (
+          <div style={{ background:"#FF2D2D", borderRadius:12, padding:16, marginBottom:20, display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+            <div>
+              <div style={{ fontSize:14, fontWeight:700, color:"#fff", fontFamily:"'Helvetica Neue',sans-serif" }}>⚠️ Abonnement expiré</div>
+              <div style={{ fontSize:12, color:"rgba(255,255,255,0.8)", fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>Abonnez-vous pour continuer à utiliser Prospeo</div>
+            </div>
+            <button style={{ padding:"8px 16px", background:"#fff", color:"#FF2D2D", border:"none", borderRadius:8, cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", flexShrink:0 }} onClick={()=>go("subscription")}>S'abonner</button>
+          </div>
+        );
+        if (subscription.status === "trial" && daysLeft <= 3) return (
+          <div style={{ background:"#FF9500", borderRadius:12, padding:16, marginBottom:20, display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+            <div>
+              <div style={{ fontSize:14, fontWeight:700, color:"#fff", fontFamily:"'Helvetica Neue',sans-serif" }}>⏳ Essai : {daysLeft} jour{daysLeft > 1?"s":""} restant{daysLeft > 1?"s":""}</div>
+              <div style={{ fontSize:12, color:"rgba(255,255,255,0.8)", fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>Activez votre abonnement pour ne pas perdre vos données</div>
+            </div>
+            <button style={{ padding:"8px 16px", background:"#fff", color:"#FF9500", border:"none", borderRadius:8, cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", flexShrink:0 }} onClick={()=>go("subscription")}>Voir les offres</button>
+          </div>
+        );
+        if (subscription.status === "trial") return (
+          <div style={{ background:"#E8F4FF", borderRadius:12, padding:14, marginBottom:16, display:"flex", alignItems:"center", gap:10 }}>
+            <span style={{ fontSize:16 }}>🎁</span>
+            <div style={{ fontFamily:"'Helvetica Neue',sans-serif", fontSize:13, color:"#1A6AFF" }}>Période d'essai gratuite — {daysLeft} jour{daysLeft>1?"s":""} restant{daysLeft>1?"s":""}</div>
+          </div>
+        );
+        return null;
+      })()}
       <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)", gap:12, marginBottom:22 }}>
         {[{label:"Total",value:stats.total,bg:"#E8E0D4",fg:"#1A1A1A"},{label:"Chauds",value:stats.chaud,bg:"#FF4C1A",fg:"#fff"},{label:"Convertis",value:stats.converti,bg:"#00C48C",fg:"#fff"},{label:"Semaine",value:stats.thisWeek,bg:"#1A1A1A",fg:"#E8E0D4"}].map(st=>(
           <div key={st.label} style={{ background:st.bg, borderRadius:14, padding:isMobile?"15px":"20px" }}>
@@ -429,9 +490,22 @@ function AddView({ profile, isMobile, notify, onAdded }) {
 
   const submit = async () => {
     if (!form.first_name||!form.last_name) { notify("Prénom et nom requis","error"); return; }
-    const { error } = await supabase.from("contacts").insert({...form, user_id:profile.id});
+    const { data: newContact, error } = await supabase
+      .from("contacts").insert({...form, user_id:profile.id}).select().single();
     if (error) { notify("Erreur enregistrement","error"); return; }
     notify(`✅ ${form.first_name} ${form.last_name} ajouté !`);
+
+    // Sync CRM automatique en arrière-plan
+    if (newContact?.id) {
+      fetch("/api/crm-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contact_id: newContact.id, user_id: profile.id }),
+      }).then(r => r.json()).then(data => {
+        if (data.synced > 0) notify(`🔗 Synchronisé avec ${data.synced} CRM`);
+      }).catch(() => {});
+    }
+
     setForm({ first_name:"", last_name:"", company:"", role:"", email:"", phone:"", source:"manuel", notes:"", status:"froid" });
     onAdded();
   };
@@ -779,14 +853,46 @@ function ListView({ contacts, profile, loadingData, isMobile, onSelect, onAdd })
   );
 }
 
-function DetailView({ contact:c, profile, isMobile, onBack, onStatusUpdate, onDelete, notify }) {
+function DetailView({ contact:initialContact, profile, isMobile, onBack, onStatusUpdate, onDelete, notify }) {
+  const [c, setC]              = useState(initialContact);
   const [synthesis, setSyn]    = useState(null);
   const [synLoad, setSynLoad]  = useState(false);
   const [past, setPast]        = useState([]);
+  const [editing, setEditing]  = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving]    = useState(false);
 
   useEffect(() => {
     supabase.from("syntheses").select("*").eq("contact_id",c.id).order("created_at",{ascending:false}).then(({data})=>setPast(data||[]));
   }, [c.id]);
+
+  const ef = (k,v) => setEditForm(p=>({...p,[k]:v}));
+
+  const startEdit = () => {
+    setEditForm({
+      first_name: c.first_name || "",
+      last_name:  c.last_name  || "",
+      company:    c.company    || "",
+      role:       c.role       || "",
+      email:      c.email      || "",
+      phone:      c.phone      || "",
+      notes:      c.notes      || "",
+    });
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    setSaving(true);
+    const { data, error } = await supabase
+      .from("contacts")
+      .update(editForm)
+      .eq("id", c.id)
+      .select()
+      .single();
+    if (error) { notify("Erreur lors de la sauvegarde","error"); }
+    else { setC({ ...c, ...data }); setEditing(false); notify("✅ Prospect mis à jour !"); }
+    setSaving(false);
+  };
 
   const genSyn = async () => {
     setSynLoad(true);
@@ -801,10 +907,47 @@ function DetailView({ contact:c, profile, isMobile, onBack, onStatusUpdate, onDe
 
   return (
     <div style={P(isMobile)}>
-      <button style={{ border:"none", background:"transparent", cursor:"pointer", color:"#888", fontFamily:"'Helvetica Neue',sans-serif", fontSize:14, marginBottom:18, padding:0 }} onClick={onBack}>← Retour</button>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:18 }}>
+        <button style={{ border:"none", background:"transparent", cursor:"pointer", color:"#888", fontFamily:"'Helvetica Neue',sans-serif", fontSize:14, padding:0 }} onClick={onBack}>← Retour</button>
+        {!editing && (
+          <button style={{ padding:"8px 16px", background:"#1A1A1A", color:"#E8E0D4", border:"none", borderRadius:8, cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
+            onClick={startEdit}>✏️ Modifier</button>
+        )}
+      </div>
 
-      <div style={{ display:"flex", gap:14, alignItems:"flex-start", marginBottom:18 }}>
-        <div style={{ ...AV, width:54, height:54, fontSize:18, flexShrink:0 }}>{c.first_name[0]}{c.last_name[0]}</div>
+      {editing && (
+        <div style={C}>
+          <h3 style={CT}>Modifier le prospect</h3>
+          <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:12, marginBottom:12 }}>
+            {[
+              { k:"first_name", l:"Prénom *",   ph:"Jean" },
+              { k:"last_name",  l:"Nom *",       ph:"Dupont" },
+              { k:"company",    l:"Entreprise",  ph:"Acme Corp" },
+              { k:"role",       l:"Poste",       ph:"Directeur Commercial" },
+              { k:"email",      l:"Email",       ph:"jean@acme.fr" },
+              { k:"phone",      l:"Téléphone",   ph:"+33 6 00 00 00 00" },
+            ].map(field => (
+              <div key={field.k}>
+                <label style={L}>{field.l}</label>
+                <input style={I} placeholder={field.ph} value={editForm[field.k]} onChange={e=>ef(field.k,e.target.value)} />
+              </div>
+            ))}
+          </div>
+          <div style={{ marginBottom:14 }}>
+            <label style={L}>Notes</label>
+            <textarea style={{ ...I, minHeight:80, resize:"vertical" }} placeholder="Besoins, contexte, prochaines étapes..." value={editForm.notes} onChange={e=>ef("notes",e.target.value)} />
+          </div>
+          <div style={{ display:"flex", gap:10 }}>
+            <button style={{ ...BS, flex:1 }} onClick={()=>setEditing(false)}>Annuler</button>
+            <button style={{ ...BP, flex:1 }} onClick={saveEdit} disabled={saving}>
+              {saving ? "Sauvegarde..." : "✅ Enregistrer"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!editing && <div style={{ display:"flex", gap:14, alignItems:"flex-start", marginBottom:18 }}>
+        <div style={{ ...AV, width:54, height:54, fontSize:18, flexShrink:0 }}>{c.first_name?.[0]}{c.last_name?.[0]}</div>
         <div>
           <h1 style={{ fontSize:isMobile?21:26, fontWeight:400, color:"#1A1A1A", margin:0, fontFamily:"Georgia,serif" }}>{c.first_name} {c.last_name}</h1>
           <p style={{ fontSize:13, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", margin:"3px 0 7px" }}>{c.role}{c.company?` · ${c.company}`:""}</p>
@@ -825,7 +968,7 @@ function DetailView({ contact:c, profile, isMobile, onBack, onStatusUpdate, onDe
         <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:8 }}>
           {Object.entries(STATUS_COLORS).map(([key,val])=>(
             <button key={key} style={{ padding:"7px 13px", borderRadius:20, cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, background:c.status===key?val.bg:"transparent", color:c.status===key?val.text:"#888", border:`2px solid ${val.bg}` }}
-              onClick={()=>onStatusUpdate(c.id,key)}>{val.label}</button>
+              onClick={()=>{ onStatusUpdate(c.id,key); setC(p=>({...p,status:key})); }}>{val.label}</button>
           ))}
         </div>
       </div>
@@ -850,9 +993,9 @@ function DetailView({ contact:c, profile, isMobile, onBack, onStatusUpdate, onDe
         {(synthesis||past[0]) && <p style={{ fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#444", lineHeight:1.7, margin:0, fontStyle:"italic" }}>{synthesis||past[0]?.content}</p>}
       </div>
 
-      <button style={{ width:"100%", padding:"12px", background:"transparent", color:"#FF2D2D", border:"2px solid #FF2D2D", borderRadius:10, cursor:"pointer", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif" }} onClick={()=>onDelete(c.id)}>
+      {!editing && <button style={{ width:"100%", padding:"12px", background:"transparent", color:"#FF2D2D", border:"2px solid #FF2D2D", borderRadius:10, cursor:"pointer", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif" }} onClick={()=>onDelete(c.id)}>
         🗑 Supprimer ce prospect
-      </button>
+      </button>}
     </div>
   );
 }
@@ -1088,6 +1231,557 @@ function ProfileView({ profile, isMobile, notify, onUpdated }) {
           {saving ? "Sauvegarde..." : "Enregistrer mon profil"}
         </button>
       </div>
+    </div>
+  );
+}
+
+function SubscriptionView({ profile, subscription, isMobile, notify, onActivated }) {
+  const [loading, setLoading] = useState(false);
+  const [showActivate, setShowActivate] = useState(false);
+
+  const subscribe = async (plan) => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/stripe-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan, email: profile.email, userId: profile.id }),
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else notify("Erreur Stripe : " + data.error, "error");
+    } catch (err) { notify("Erreur : " + err.message, "error"); }
+    setLoading(false);
+  };
+
+  const now      = new Date();
+  const trialEnd = subscription?.trial_ends_at ? new Date(subscription.trial_ends_at) : null;
+  const subEnd   = subscription?.current_period_end ? new Date(subscription.current_period_end) : null;
+  const daysLeft = trialEnd ? Math.max(0, Math.ceil((trialEnd - now) / 86400000)) : 0;
+
+  const statusLabel = () => {
+    if (!subscription) return { text:"Chargement...", color:"#888" };
+    if (subscription.status==="active")    return { text:`✅ Actif — expire le ${subEnd?.toLocaleDateString("fr-FR")}`, color:"#00C48C" };
+    if (subscription.status==="trial")     return { text:`🎁 Essai gratuit — ${daysLeft} jour${daysLeft>1?"s":""} restant${daysLeft>1?"s":""}`, color:"#1A6AFF" };
+    if (subscription.status==="expired")   return { text:"❌ Expiré", color:"#FF2D2D" };
+    if (subscription.status==="cancelled") return { text:"Annulé", color:"#888" };
+    return { text:"Inconnu", color:"#888" };
+  };
+  const sl = statusLabel();
+
+  return (
+    <div style={P(isMobile)}>
+      <div style={{ marginBottom:22 }}>
+        <h1 style={T(isMobile)}>Mon abonnement</h1>
+        <p style={Sub}>Gérez votre accès à Prospeo</p>
+      </div>
+
+      {/* Statut actuel */}
+      <div style={{ ...C, marginBottom:16 }}>
+        <h3 style={CT}>Statut actuel</h3>
+        <div style={{ fontSize:15, fontFamily:"'Helvetica Neue',sans-serif", color:sl.color, fontWeight:600, marginBottom:8 }}>{sl.text}</div>
+        <div style={{ fontSize:13, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{profile?.email}</div>
+      </div>
+
+      {/* Offres */}
+      {(subscription?.status !== "active") && (
+        <div style={{ marginBottom:16 }}>
+          <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, textTransform:"uppercase", letterSpacing:1, marginBottom:12 }}>Choisissez votre offre</div>
+          <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:12 }}>
+
+            {/* Mensuel */}
+            <div style={{ background:"#fff", borderRadius:14, padding:20, border:"2px solid #E8E0D4" }}>
+              <div style={{ fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#888", marginBottom:8 }}>Mensuel</div>
+              <div style={{ fontSize:28, fontWeight:700, color:"#1A1A1A", fontFamily:"'Helvetica Neue',sans-serif" }}>4,99€ HT<span style={{ fontSize:14, fontWeight:400, color:"#888" }}>/mois</span></div>
+              <div style={{ fontSize:12, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4, marginBottom:16 }}>Sans engagement</div>
+              {["Prospects illimités","Scan carte IA","Synthèse IA","Export Excel","Rapports"].map(f=>(
+                <div key={f} style={{ fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#444", marginBottom:6 }}>✓ {f}</div>
+              ))}
+              <button style={{ ...BP, width:"100%", marginTop:16 }} onClick={()=>subscribe("monthly")} disabled={loading}>
+                {loading?"Redirection...":"Choisir"}
+              </button>
+            </div>
+
+            {/* Annuel */}
+            <div style={{ background:"#1A1A1A", borderRadius:14, padding:20, border:"2px solid #FF4C1A", position:"relative" }}>
+              <div style={{ position:"absolute", top:-10, right:16, background:"#FF4C1A", color:"#fff", fontSize:10, fontWeight:700, padding:"3px 10px", borderRadius:20, fontFamily:"'Helvetica Neue',sans-serif" }}>MEILLEURE OFFRE</div>
+              <div style={{ fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#888", marginBottom:8 }}>Annuel</div>
+              <div style={{ fontSize:28, fontWeight:700, color:"#E8E0D4", fontFamily:"'Helvetica Neue',sans-serif" }}>59,88€<span style={{ fontSize:14, fontWeight:400, color:"#888" }}>/an</span></div>
+              <div style={{ fontSize:12, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4, marginBottom:16 }}>= 4,99€ HT/mois · 2 mois offerts</div>
+              {["Prospects illimités","Scan carte IA","Synthèse IA","Export Excel","Rapports"].map(f=>(
+                <div key={f} style={{ fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#aaa", marginBottom:6 }}>✓ {f}</div>
+              ))}
+              <button style={{ ...BP, width:"100%", marginTop:16, background:"#FF4C1A" }} onClick={()=>subscribe("annual")} disabled={loading}>
+                {loading?"Redirection...":"Choisir"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Activer une clé */}
+      <div style={C}>
+        <h3 style={CT}>Vous avez une clé d'activation ?</h3>
+        <p style={{ fontSize:13, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 12px" }}>Entrez la clé reçue par email après votre paiement.</p>
+        <button style={{ ...BS, width:"100%" }} onClick={()=>setShowActivate(!showActivate)}>
+          🔑 Activer une clé
+        </button>
+        {showActivate && <ActivateKeyView profile={profile} isMobile={isMobile} notify={notify} onActivated={onActivated} inline />}
+      </div>
+    </div>
+  );
+}
+
+function ActivateKeyView({ profile, isMobile, notify, onActivated, inline }) {
+  const [key, setKey]       = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const activate = async () => {
+    if (!key.trim()) { notify("Entrez une clé d'activation","error"); return; }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/activate-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: key.trim().toUpperCase(), userId: profile.id, email: profile.email }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        notify("🎉 " + data.message);
+        onActivated();
+      } else {
+        notify(data.error || "Clé invalide","error");
+      }
+    } catch (err) { notify("Erreur : " + err.message,"error"); }
+    setLoading(false);
+  };
+
+  return (
+    <div style={inline ? { marginTop:16 } : P(isMobile)}>
+      {!inline && <h1 style={T(isMobile)}>Activer ma clé</h1>}
+      <div style={{ marginTop:inline?0:20 }}>
+        <label style={L}>Clé d'activation</label>
+        <input style={{ ...I, textTransform:"uppercase", letterSpacing:2, fontFamily:"'Courier New',monospace", marginBottom:12 }}
+          placeholder="PROS-XXXX-XXXX-XXXX"
+          value={key}
+          onChange={e=>setKey(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&activate()}
+        />
+        <button style={{ ...BP, width:"100%" }} onClick={activate} disabled={loading||!key.trim()}>
+          {loading?"Activation...":"🔑 Activer mon abonnement"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CRMConfigView({ profile, isMobile, notify }) {
+  const [configs, setConfigs]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm]         = useState({ crm_type:"generic", name:"", config:{}, active:true });
+  const [saving, setSaving]     = useState(false);
+
+  const CRM_TYPES = [
+    { id:"hubspot",    label:"HubSpot",    fields:[{k:"api_key",l:"API Key (Private App Token)"}] },
+    { id:"salesforce", label:"Salesforce", fields:[{k:"instance_url",l:"URL Instance (ex: https://xxx.salesforce.com)"},{k:"client_id",l:"Client ID"},{k:"client_secret",l:"Client Secret"},{k:"username",l:"Username"},{k:"password",l:"Password"},{k:"security_token",l:"Security Token"}] },
+    { id:"pipedrive",  label:"Pipedrive",  fields:[{k:"api_key",l:"API Token"}] },
+    { id:"zoho",       label:"Zoho CRM",   fields:[{k:"access_token",l:"Access Token OAuth2"}] },
+    { id:"odoo",       label:"Odoo",       fields:[{k:"url",l:"URL Odoo (ex: https://monodoo.com)"},{k:"db",l:"Nom base de données"},{k:"username",l:"Email utilisateur"},{k:"password",l:"Mot de passe"}] },
+    { id:"generic",    label:"CRM Générique / Webhook", fields:[{k:"webhook_url",l:"URL Webhook (POST)"},{k:"api_key",l:"Clé API (Bearer token, optionnel)"},{k:"secret_key",l:"Secret Webhook (optionnel)"}] },
+  ];
+
+  const loadConfigs = async () => {
+    const { data } = await supabase.from("crm_configs").select("*").eq("user_id", profile.id);
+    setConfigs(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadConfigs(); }, []);
+
+  const selectedCRM = CRM_TYPES.find(c => c.id === form.crm_type);
+
+  const save = async () => {
+    if (!form.name) { notify("Donnez un nom à cette configuration","error"); return; }
+    setSaving(true);
+    const { error } = await supabase.from("crm_configs").insert({
+      user_id: profile.id,
+      crm_type: form.crm_type,
+      name: form.name,
+      active: true,
+      config: form.config,
+    });
+    if (error) notify("Erreur sauvegarde","error");
+    else { notify("✅ CRM configuré !"); setShowForm(false); loadConfigs(); }
+    setSaving(false);
+  };
+
+  const toggle = async (id, active) => {
+    await supabase.from("crm_configs").update({ active: !active }).eq("id", id);
+    loadConfigs();
+  };
+
+  const remove = async (id) => {
+    await supabase.from("crm_configs").delete().eq("id", id);
+    loadConfigs();
+    notify("Configuration supprimée");
+  };
+
+  return (
+    <div style={P(isMobile)}>
+      <div style={{ marginBottom:20 }}>
+        <h1 style={T(isMobile)}>🔗 Intégration CRM</h1>
+        <p style={Sub}>Synchronisation automatique de vos prospects</p>
+      </div>
+
+      {/* Info */}
+      <div style={{ background:"#E8F4FF", borderRadius:12, padding:14, marginBottom:16, display:"flex", gap:10 }}>
+        <span>💡</span>
+        <div style={{ fontSize:13, color:"#1A6AFF", fontFamily:"'Helvetica Neue',sans-serif", lineHeight:1.5 }}>
+          Chaque prospect ajouté sera automatiquement envoyé vers vos CRM configurés en temps réel.
+        </div>
+      </div>
+
+      {/* Configs existantes */}
+      {loading ? <div style={LT}>Chargement...</div> : (
+        <>
+          {configs.length === 0 && !showForm && (
+            <div style={{ ...C, textAlign:"center", padding:32, marginBottom:16 }}>
+              <div style={{ fontSize:32, marginBottom:10 }}>🔗</div>
+              <div style={{ fontFamily:"'Helvetica Neue',sans-serif", color:"#888", marginBottom:16 }}>Aucun CRM configuré</div>
+              <button style={BP} onClick={()=>setShowForm(true)}>+ Connecter un CRM</button>
+            </div>
+          )}
+
+          {configs.map(cfg => (
+            <div key={cfg.id} style={{ ...C, marginBottom:10, display:"flex", alignItems:"center", gap:12 }}>
+              <div style={{ width:36, height:36, borderRadius:10, background: cfg.active?"#EBF8F4":"#F0EBE0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>
+                {cfg.crm_type==="hubspot"?"🟠":cfg.crm_type==="salesforce"?"☁️":cfg.crm_type==="pipedrive"?"🎯":cfg.crm_type==="zoho"?"🔴":cfg.crm_type==="odoo"?"🟣":"🔗"}
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:14, fontWeight:600, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>{cfg.name}</div>
+                <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{CRM_TYPES.find(c=>c.id===cfg.crm_type)?.label} · {cfg.active?"✅ Actif":"⏸ Inactif"}</div>
+              </div>
+              <div style={{ display:"flex", gap:6 }}>
+                <button style={{ padding:"5px 10px", border:"1.5px solid #E8E0D4", borderRadius:6, background:"transparent", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", color:"#888" }}
+                  onClick={()=>toggle(cfg.id, cfg.active)}>{cfg.active?"Pause":"Activer"}</button>
+                <button style={{ padding:"5px 10px", border:"1.5px solid #FF2D2D", borderRadius:6, background:"transparent", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", color:"#FF2D2D" }}
+                  onClick={()=>remove(cfg.id)}>✕</button>
+              </div>
+            </div>
+          ))}
+
+          {configs.length > 0 && !showForm && (
+            <button style={{ ...BS, width:"100%", marginTop:8 }} onClick={()=>setShowForm(true)}>+ Ajouter un autre CRM</button>
+          )}
+        </>
+      )}
+
+      {/* Formulaire ajout */}
+      {showForm && (
+        <div style={{ ...C, marginTop:16 }}>
+          <h3 style={CT}>Nouveau connecteur CRM</h3>
+
+          <div style={{ marginBottom:14 }}>
+            <label style={L}>Votre CRM</label>
+            <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3,1fr)", gap:8 }}>
+              {CRM_TYPES.map(crm => (
+                <button key={crm.id}
+                  style={{ padding:"10px 8px", border:`2px solid ${form.crm_type===crm.id?"#FF4C1A":"#E8E0D4"}`, borderRadius:10, background:form.crm_type===crm.id?"#FFF4EE":"transparent", cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:form.crm_type===crm.id?"#FF4C1A":"#888", fontWeight:form.crm_type===crm.id?700:400 }}
+                  onClick={()=>setForm(f=>({...f, crm_type:crm.id, config:{}}))}>
+                  {crm.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom:14 }}>
+            <label style={L}>Nom de cette configuration</label>
+            <input style={I} placeholder={`Ex: ${selectedCRM?.label} Production`}
+              value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} />
+          </div>
+
+          {selectedCRM?.fields.map(field => (
+            <div key={field.k} style={{ marginBottom:12 }}>
+              <label style={L}>{field.l}</label>
+              <input style={{ ...I, fontFamily: field.k.includes("key")||field.k.includes("token")||field.k.includes("secret") ? "'Courier New',monospace" : "'Helvetica Neue',sans-serif" }}
+                placeholder={field.k.includes("url") ? "https://" : field.k.includes("key")||field.k.includes("token") ? "••••••••••••" : ""}
+                type={field.k.includes("password")||field.k.includes("secret") ? "password" : "text"}
+                value={form.config[field.k]||""}
+                onChange={e=>setForm(f=>({...f, config:{...f.config, [field.k]:e.target.value}}))}
+              />
+            </div>
+          ))}
+
+          {form.crm_type === "generic" && (
+            <div style={{ marginBottom:12 }}>
+              <label style={L}>Mapping des champs (optionnel)</label>
+              <div style={{ padding:12, background:"#F5F0E8", borderRadius:8, fontSize:12, fontFamily:"'Courier New',monospace", color:"#444", lineHeight:1.6 }}>
+                {`{
+  "first_name": "FirstName",
+  "last_name": "LastName",
+  "email": "Email",
+  "phone": "Phone",
+  "company": "Company"
+}`}
+              </div>
+              <div style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4 }}>Laissez vide pour recevoir toutes les données Prospeo</div>
+            </div>
+          )}
+
+          <div style={{ display:"flex", gap:10, marginTop:16 }}>
+            <button style={{ ...BS, flex:1 }} onClick={()=>setShowForm(false)}>Annuler</button>
+            <button style={{ ...BP, flex:1 }} onClick={save} disabled={saving}>
+              {saving?"Sauvegarde...":"✅ Connecter ce CRM"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Doc API publique */}
+      <div style={{ ...C, marginTop:16, background:"#1A1A1A" }}>
+        <h3 style={{ ...CT, color:"#888" }}>API Publique Prospeo</h3>
+        <div style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:10 }}>
+          Votre CRM peut aussi recevoir les données via cette URL webhook :
+        </div>
+        <div style={{ fontFamily:"'Courier New',monospace", fontSize:12, color:"#FF4C1A", background:"#111", padding:12, borderRadius:8, marginBottom:8, wordBreak:"break-all" }}>
+          POST https://prospeo-red.vercel.app/api/crm-sync
+        </div>
+        <div style={{ fontSize:11, color:"#555", fontFamily:"'Helvetica Neue',sans-serif", lineHeight:1.6 }}>
+          Format JSON envoyé : first_name, last_name, company, role, email, phone, status, source, notes, created_at
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SuperAdminView({ profile, isMobile, notify }) {
+  const [data, setData]           = useState(null);
+  const [loading, setLoading]     = useState(true);
+  const [tab, setTab]             = useState("keys");
+  const [genQty, setGenQty]       = useState(1);
+  const [genEmail, setGenEmail]   = useState("");
+  const [genCompany, setGenCompany] = useState("");
+  const [genNotes, setGenNotes]   = useState("");
+  const [genLoading, setGenLoading] = useState(false);
+  const [newKeys, setNewKeys]     = useState([]);
+
+  const call = async (action, extra = {}) => {
+    const res = await fetch("/api/superadmin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, callerEmail: profile.email, ...extra }),
+    });
+    return res.json();
+  };
+
+  useEffect(() => {
+    call("getData").then(d => { setData(d); setLoading(false); });
+  }, []);
+
+  const generateKeys = async () => {
+    setGenLoading(true);
+    setNewKeys([]);
+    const res = await call("generateKeys", {
+      quantity: genQty, email: genEmail,
+      companyName: genCompany, notes: genNotes,
+    });
+    if (res.success) {
+      setNewKeys(res.keys);
+      notify(`✅ ${res.message}`);
+      call("getData").then(d => setData(d));
+    } else {
+      notify(res.error || "Erreur", "error");
+    }
+    setGenLoading(false);
+  };
+
+  const disableAccount = async (userId, name) => {
+    if (!confirm(`Désactiver le compte de ${name} ?`)) return;
+    const res = await call("disableAccount", { userId });
+    if (res.success) { notify("Compte désactivé"); call("getData").then(d => setData(d)); }
+    else notify(res.error, "error");
+  };
+
+  const extendAccount = async (userId, name) => {
+    const res = await call("extendSubscription", { userId, months: 12 });
+    if (res.success) { notify(`✅ ${name} prolongé de 12 mois`); call("getData").then(d => setData(d)); }
+    else notify(res.error, "error");
+  };
+
+  // Stats
+  const stats = data ? {
+    totalUsers:   data.profiles?.length || 0,
+    activeUsers:  data.subscriptions?.filter(s => s.status === "active").length || 0,
+    trialUsers:   data.subscriptions?.filter(s => s.status === "trial").length || 0,
+    expiredUsers: data.subscriptions?.filter(s => s.status === "expired").length || 0,
+    totalKeys:    data.keys?.length || 0,
+    usedKeys:     data.keys?.filter(k => k.used).length || 0,
+    companies:    data.companies?.length || 0,
+  } : {};
+
+  const getSubForUser = (userId) => data?.subscriptions?.find(s => s.user_id === userId);
+
+  const statusColor = (s) => {
+    if (!s) return "#888";
+    if (s.status === "active")  return "#00C48C";
+    if (s.status === "trial")   return "#1A6AFF";
+    if (s.status === "expired") return "#FF2D2D";
+    return "#888";
+  };
+  const statusLabel = (s) => {
+    if (!s) return "Aucun";
+    if (s.status === "active")  return `✅ Actif jusqu'au ${new Date(s.current_period_end).toLocaleDateString("fr-FR")}`;
+    if (s.status === "trial")   return `🎁 Trial jusqu'au ${new Date(s.trial_ends_at).toLocaleDateString("fr-FR")}`;
+    if (s.status === "expired") return "❌ Expiré";
+    if (s.status === "cancelled") return "Annulé";
+    return s.status;
+  };
+
+  return (
+    <div style={P(isMobile)}>
+      <div style={{ marginBottom:20 }}>
+        <h1 style={T(isMobile)}>🔐 Super Admin</h1>
+        <p style={Sub}>Tableau de bord de gestion — accès exclusif</p>
+      </div>
+
+      {loading ? <div style={LT}>Chargement...</div> : (
+        <>
+          {/* Stats */}
+          <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)", gap:10, marginBottom:20 }}>
+            {[
+              { label:"Utilisateurs", value:stats.totalUsers,  bg:"#E8E0D4", fg:"#1A1A1A" },
+              { label:"Actifs",       value:stats.activeUsers,  bg:"#00C48C", fg:"#fff"    },
+              { label:"En essai",     value:stats.trialUsers,   bg:"#1A6AFF", fg:"#fff"    },
+              { label:"Expirés",      value:stats.expiredUsers, bg:"#FF2D2D", fg:"#fff"    },
+            ].map(st => (
+              <div key={st.label} style={{ background:st.bg, borderRadius:12, padding:14 }}>
+                <div style={{ fontSize:26, fontWeight:700, color:st.fg }}>{st.value}</div>
+                <div style={{ fontSize:10, color:st.fg, opacity:0.7, fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5, marginTop:3 }}>{st.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Tabs */}
+          <div style={{ display:"flex", gap:6, marginBottom:16, flexWrap:"wrap" }}>
+            {[["keys","🔑 Générer KEYs"],["users","👥 Utilisateurs"],["allkeys","📋 Toutes les KEYs"]].map(([id,label]) => (
+              <button key={id} style={{ padding:"8px 14px", border:`2px solid ${tab===id?"#1A1A1A":"#E8E0D4"}`, borderRadius:20, background:tab===id?"#1A1A1A":"transparent", color:tab===id?"#E8E0D4":"#888", cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
+                onClick={()=>setTab(id)}>{label}</button>
+            ))}
+          </div>
+
+          {/* ── GÉNÉRER DES KEYS ── */}
+          {tab === "keys" && (
+            <div style={C}>
+              <h3 style={CT}>Générer des clés d'activation</h3>
+              <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:12, marginBottom:14 }}>
+                <div>
+                  <label style={L}>Nombre de licences</label>
+                  <input style={I} type="number" min="1" max="100" value={genQty}
+                    onChange={e=>setGenQty(parseInt(e.target.value)||1)} />
+                  {genQty > 1 && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4 }}>
+                    → 1 clé Manager + {genQty-1} clé(s) Commercial · chaque licence = 59,88€/an
+                  </div>}
+                </div>
+                <div>
+                  <label style={L}>Email client (optionnel)</label>
+                  <input style={I} placeholder="client@entreprise.fr" value={genEmail} onChange={e=>setGenEmail(e.target.value)} />
+                </div>
+                {genQty > 1 && (
+                  <div>
+                    <label style={L}>Nom de l'entreprise</label>
+                    <input style={I} placeholder="Acme Corp" value={genCompany} onChange={e=>setGenCompany(e.target.value)} />
+                  </div>
+                )}
+                <div>
+                  <label style={L}>Notes internes</label>
+                  <input style={I} placeholder="Ex: Offre salon..." value={genNotes} onChange={e=>setGenNotes(e.target.value)} />
+                </div>
+              </div>
+
+              <div style={{ padding:14, background:"#F5F0E8", borderRadius:10, marginBottom:14 }}>
+                <div style={{ fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>
+                  💶 Total : <strong>{(genQty * 59.88).toFixed(2)}€</strong> TTC
+                  ({genQty} × 59,88€/licence · toutes les licences sont payantes)
+                </div>
+              </div>
+
+              <button style={{ ...BP, width:"100%" }} onClick={generateKeys} disabled={genLoading}>
+                {genLoading ? "Génération..." : `🔑 Générer ${genQty} clé${genQty>1?"s":""}`}
+              </button>
+
+              {newKeys.length > 0 && (
+                <div style={{ marginTop:16, background:"#EBF8F4", borderRadius:10, padding:16 }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:"#00C48C", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:10 }}>
+                    ✅ {newKeys.length} clé(s) générée(s) — copiez et envoyez au client
+                  </div>
+                  {newKeys.map((k, i) => (
+                    <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderBottom:"1px solid #C8EFE5" }}>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontFamily:"'Courier New',monospace", fontSize:14, fontWeight:700, color:"#1A1A1A", letterSpacing:1 }}>{k.key}</div>
+                        <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{k.type}</div>
+                      </div>
+                      <button style={{ padding:"5px 10px", background:"#1A1A1A", color:"#fff", border:"none", borderRadius:6, cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif" }}
+                        onClick={()=>{ navigator.clipboard.writeText(k.key); notify("Clé copiée !"); }}>
+                        Copier
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── UTILISATEURS ── */}
+          {tab === "users" && (
+            <div style={C}>
+              <h3 style={CT}>{data.profiles?.length} utilisateurs</h3>
+              {data.profiles?.filter(p => p.email !== "fanne@lafitel.eu").map(p => {
+                const sub = getSubForUser(p.id);
+                return (
+                  <div key={p.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 0", borderBottom:"1px solid #F0EBE0" }}>
+                    <div style={{ width:36, height:36, borderRadius:"50%", background: p.role==="manager"?"#FF4C1A":"#1A1A1A", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", flexShrink:0 }}>
+                      {(p.full_name||p.email)[0].toUpperCase()}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:600, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>{p.full_name||"—"}</div>
+                      <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{p.email} · {p.role}</div>
+                      <div style={{ fontSize:11, color:statusColor(sub), fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}>{statusLabel(sub)}</div>
+                    </div>
+                    <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+                      <button style={{ padding:"4px 8px", background:"#00C48C", color:"#fff", border:"none", borderRadius:5, cursor:"pointer", fontSize:10, fontFamily:"'Helvetica Neue',sans-serif" }}
+                        onClick={()=>extendAccount(p.id, p.full_name||p.email)}>+12 mois</button>
+                      <button style={{ padding:"4px 8px", background:"#FF2D2D", color:"#fff", border:"none", borderRadius:5, cursor:"pointer", fontSize:10, fontFamily:"'Helvetica Neue',sans-serif" }}
+                        onClick={()=>disableAccount(p.id, p.full_name||p.email)}>Désactiver</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── TOUTES LES KEYS ── */}
+          {tab === "allkeys" && (
+            <div style={C}>
+              <h3 style={CT}>{data.keys?.length} clés · {stats.usedKeys} utilisées</h3>
+              {data.keys?.map(k => (
+                <div key={k.id} style={{ padding:"10px 0", borderBottom:"1px solid #F0EBE0" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <div style={{ fontFamily:"'Courier New',monospace", fontSize:13, fontWeight:700, color: k.used ? "#aaa" : "#1A1A1A", flex:1, letterSpacing:1, textDecoration: k.used?"line-through":"none" }}>{k.key}</div>
+                    <div style={{ fontSize:10, padding:"2px 7px", borderRadius:10, background: k.used?"#F0EBE0":"#EBF8F4", color: k.used?"#888":"#00875A", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}>
+                      {k.used?"Utilisée":"Disponible"}
+                    </div>
+                  </div>
+                  <div style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", marginTop:3 }}>
+                    {k.key_type} · {k.email||"—"} · expire {new Date(k.expires_at).toLocaleDateString("fr-FR")}
+                    {k.notes && ` · ${k.notes}`}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
