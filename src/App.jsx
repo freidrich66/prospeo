@@ -1467,6 +1467,61 @@ function SubscriptionView({ profile, subscription, isMobile, notify, onActivated
         </div>
       )}
 
+      {/* Ajouter licences supplémentaires — visible pour les managers actifs */}
+      {profile?.role === "manager" && subscription?.status === "active" && (
+        <div style={{ ...C, marginBottom:16 }}>
+          <h3 style={CT}>➕ Ajouter des licences commerciaux</h3>
+          <p style={{ fontSize:13, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 12px", lineHeight:1.5 }}>
+            Ajoutez des licences supplémentaires pour vos commerciaux. Chaque licence = 59,88€ HT/an.
+          </p>
+          {(() => {
+            const [addQtyLocal, setAddQtyLocal] = React.useState(1);
+            const [addingLicence, setAddingLicence] = React.useState(false);
+            const buyMore = async () => {
+              setAddingLicence(true);
+              try {
+                const res = await fetch("/api/stripe-checkout", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    email: profile.email,
+                    userId: profile.id,
+                    quantity: addQtyLocal,
+                    companyName: profile.company || "",
+                    addToExisting: true,
+                  }),
+                });
+                const data = await res.json();
+                if (data.url) window.location.href = data.url;
+                else notify("Erreur : " + data.error, "error");
+              } catch(err) { notify("Erreur : " + err.message, "error"); }
+              setAddingLicence(false);
+            };
+            return (
+              <div>
+                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+                  <button style={{ width:34, height:34, border:"2px solid #E8E0D4", borderRadius:8, background:"#fff", cursor:"pointer", fontSize:16, fontWeight:700 }}
+                    onClick={()=>setAddQtyLocal(q=>Math.max(1,q-1))}>−</button>
+                  <div style={{ textAlign:"center", minWidth:60 }}>
+                    <div style={{ fontSize:22, fontWeight:700, color:"#1A1A1A" }}>{addQtyLocal}</div>
+                    <div style={{ fontSize:10, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>licence{addQtyLocal>1?"s":""}</div>
+                  </div>
+                  <button style={{ width:34, height:34, border:"2px solid #E8E0D4", borderRadius:8, background:"#fff", cursor:"pointer", fontSize:16, fontWeight:700 }}
+                    onClick={()=>setAddQtyLocal(q=>Math.min(50,q+1))}>+</button>
+                  <div style={{ flex:1, padding:"10px 14px", background:"#F5F0E8", borderRadius:10, fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>
+                    <strong>{(addQtyLocal * 59.88).toFixed(2)}€ HT</strong>
+                    <div style={{ fontSize:10, color:"#888" }}>{addQtyLocal} × 59,88€/an</div>
+                  </div>
+                </div>
+                <button style={{ ...BP, width:"100%" }} onClick={buyMore} disabled={addingLicence}>
+                  {addingLicence ? "Redirection..." : `Acheter ${addQtyLocal} licence${addQtyLocal>1?"s":""} →`}
+                </button>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Activer une clé */}
       <div style={C}>
         <h3 style={CT}>Vous avez une clé d'activation ?</h3>
@@ -1715,6 +1770,14 @@ function SuperAdminView({ profile, isMobile, notify }) {
   const [genLoading, setGenLoading] = useState(false);
   const [newKeys, setNewKeys]     = useState([]);
 
+  // ── Ajouter licences à une entreprise existante ──
+  const [addCompanyId, setAddCompanyId]   = useState("");
+  const [addQty, setAddQty]               = useState(1);
+  const [addNotes, setAddNotes]           = useState("");
+  const [addTrial, setAddTrial]           = useState("annual");
+  const [addLoading, setAddLoading]       = useState(false);
+  const [addedKeys, setAddedKeys]         = useState([]);
+
   const call = async (action, extra = {}) => {
     const res = await fetch("/api/superadmin", {
       method: "POST",
@@ -1744,6 +1807,27 @@ function SuperAdminView({ profile, isMobile, notify }) {
       notify(res.error || "Erreur", "error");
     }
     setGenLoading(false);
+  };
+
+  const addLicences = async () => {
+    if (!addCompanyId) { notify("Sélectionnez une entreprise","error"); return; }
+    setAddLoading(true);
+    setAddedKeys([]);
+    const company = data.companies?.find(c => c.id === addCompanyId);
+    const res = await call("addLicences", {
+      companyId: addCompanyId,
+      quantity: addQty,
+      notes: addNotes,
+      trialDays: addTrial === "trial7" ? 7 : addTrial === "trial14" ? 14 : 0,
+    });
+    if (res.success) {
+      setAddedKeys(res.keys);
+      notify(`✅ ${res.message}`);
+      call("getData").then(d => setData(d));
+    } else {
+      notify(res.error || "Erreur", "error");
+    }
+    setAddLoading(false);
   };
 
   const disableAccount = async (userId, name) => {
@@ -1814,7 +1898,7 @@ function SuperAdminView({ profile, isMobile, notify }) {
 
           {/* Tabs */}
           <div style={{ display:"flex", gap:6, marginBottom:16, flexWrap:"wrap" }}>
-            {[["keys","🔑 Générer KEYs"],["users","👥 Utilisateurs"],["allkeys","📋 Toutes les KEYs"]].map(([id,label]) => (
+            {[["keys","🔑 Générer KEYs"],["addlicences","➕ Ajouter licences"],["users","👥 Utilisateurs"],["allkeys","📋 Toutes les KEYs"]].map(([id,label]) => (
               <button key={id} style={{ padding:"8px 14px", border:`2px solid ${tab===id?"#1A1A1A":"#E8E0D4"}`, borderRadius:20, background:tab===id?"#1A1A1A":"transparent", color:tab===id?"#E8E0D4":"#888", cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
                 onClick={()=>setTab(id)}>{label}</button>
             ))}
@@ -1935,6 +2019,110 @@ function SuperAdminView({ profile, isMobile, notify }) {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* ── AJOUTER LICENCES À UNE ENTREPRISE EXISTANTE ── */}
+          {tab === "addlicences" && (
+            <div style={C}>
+              <h3 style={CT}>Ajouter des licences à une entreprise existante</h3>
+
+              {data.companies?.length === 0 ? (
+                <div style={{ color:"#888", fontFamily:"'Helvetica Neue',sans-serif", fontSize:13, textAlign:"center", padding:20 }}>
+                  Aucune entreprise enregistrée. Générez d'abord un pack multi-licences.
+                </div>
+              ) : (
+                <>
+                  <div style={{ marginBottom:14 }}>
+                    <label style={L}>Entreprise cliente</label>
+                    <select value={addCompanyId} onChange={e=>setAddCompanyId(e.target.value)}
+                      style={{ ...I, cursor:"pointer" }}>
+                      <option value="">-- Sélectionner une entreprise --</option>
+                      {data.companies?.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.email}) — {c.licence_count} licence(s)
+                        </option>
+                      ))}
+                    </select>
+                    {addCompanyId && (() => {
+                      const co = data.companies?.find(c => c.id === addCompanyId);
+                      const coKeys = data.keys?.filter(k => k.company_id === addCompanyId);
+                      const used = coKeys?.filter(k => k.used).length || 0;
+                      const total = coKeys?.length || 0;
+                      return (
+                        <div style={{ marginTop:8, padding:"10px 12px", background:"#F5F0E8", borderRadius:8, fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>
+                          📊 {total} licence(s) existante(s) · {used} utilisée(s) · {total - used} disponible(s)
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
+                    <div>
+                      <label style={L}>Licences à ajouter</label>
+                      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                        <button style={{ width:36, height:36, border:"2px solid #E8E0D4", borderRadius:8, background:"#fff", cursor:"pointer", fontSize:18, fontWeight:700 }}
+                          onClick={()=>setAddQty(q=>Math.max(1,q-1))}>−</button>
+                        <input style={{ ...I, width:70, textAlign:"center", padding:"8px" }} type="number" min="1" max="100"
+                          value={addQty} onChange={e=>{ const v=parseInt(e.target.value); if(!isNaN(v)&&v>=1) setAddQty(v); }} />
+                        <button style={{ width:36, height:36, border:"2px solid #E8E0D4", borderRadius:8, background:"#fff", cursor:"pointer", fontSize:18, fontWeight:700 }}
+                          onClick={()=>setAddQty(q=>Math.min(100,q+1))}>+</button>
+                      </div>
+                      <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4 }}>
+                        → {addQty} clé(s) Commercial ajoutée(s) au même batch
+                      </div>
+                    </div>
+                    <div>
+                      <label style={L}>Type</label>
+                      <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                        {[
+                          { val:"annual",  label:"💳 12 mois", color:"#1A1A1A", tc:"#E8E0D4" },
+                          { val:"trial7",  label:"🎁 7 jours",  color:"#1A6AFF", tc:"#fff"    },
+                          { val:"trial14", label:"🎁 14 jours", color:"#00C48C", tc:"#fff"    },
+                        ].map(opt => (
+                          <button key={opt.val}
+                            style={{ flex:1, padding:"8px 6px", border:`2px solid ${addTrial===opt.val?opt.color:"#E8E0D4"}`, borderRadius:8, background:addTrial===opt.val?opt.color:"transparent", color:addTrial===opt.val?opt.tc:"#888", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
+                            onClick={()=>setAddTrial(opt.val)}>{opt.label}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom:14 }}>
+                    <label style={L}>Notes internes</label>
+                    <input style={I} placeholder="Ex: Extension contrat mars 2026..." value={addNotes} onChange={e=>setAddNotes(e.target.value)} />
+                  </div>
+
+                  <div style={{ padding:12, background:addTrial!=="annual"?"#EBF0FF":"#F5F0E8", borderRadius:10, marginBottom:14, fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>
+                    {addTrial !== "annual"
+                      ? <span>🎁 <strong>{addQty} clé(s) d'essai</strong> — aucune facturation</span>
+                      : <span>💶 <strong>{(addQty * 59.88).toFixed(2)}€ HT</strong> · {addQty} × 59,88€/an</span>
+                    }
+                  </div>
+
+                  <button style={{ ...BP, width:"100%" }} onClick={addLicences} disabled={addLoading||!addCompanyId}>
+                    {addLoading ? "Génération..." : `➕ Ajouter ${addQty} licence${addQty>1?"s":""}`}
+                  </button>
+
+                  {addedKeys.length > 0 && (
+                    <div style={{ marginTop:16, background:"#EBF8F4", borderRadius:10, padding:16 }}>
+                      <div style={{ fontSize:12, fontWeight:700, color:"#00C48C", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:10 }}>
+                        ✅ {addedKeys.length} clé(s) ajoutée(s) — à envoyer au client
+                      </div>
+                      {addedKeys.map((k, i) => (
+                        <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderBottom:"1px solid #C8EFE5" }}>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontFamily:"'Courier New',monospace", fontSize:14, fontWeight:700, color:"#1A1A1A", letterSpacing:1 }}>{k.key}</div>
+                            <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{k.type}</div>
+                          </div>
+                          <button style={{ padding:"5px 10px", background:"#1A1A1A", color:"#fff", border:"none", borderRadius:6, cursor:"pointer", fontSize:11 }}
+                            onClick={()=>{ navigator.clipboard.writeText(k.key); notify("Clé copiée !"); }}>Copier</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 
