@@ -6,6 +6,7 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "orientation": "portrait",
   "background_color": "#1A1A1A",
   "theme_color": "#FF4C1A",
@@ -13,6 +14,8 @@
   "dir": "ltr",
   "categories": ["business", "productivity"],
   "prefer_related_applications": false,
+  "related_applications": [],
+  "iarc_rating_id": "",
   "icons": [
     { "src": "/icons/icon-72.png",   "sizes": "72x72",   "type": "image/png", "purpose": "any maskable" },
     { "src": "/icons/icon-96.png",   "sizes": "96x96",   "type": "image/png", "purpose": "any maskable" },
@@ -58,6 +61,64 @@
       "short_name": "Dashboard",
       "description": "Centralizes sales rep and manager information in real time",
       "url": "/"
+    }
+  ],
+  "share_target": {
+    "action": "/?action=add",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "note_taking": {
+    "new_note_url": "/?action=add"
+  },
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "file_handlers": [
+    {
+      "action": "/",
+      "accept": {
+        "text/csv": [".csv"],
+        "application/vnd.ms-excel": [".xls", ".xlsx"]
+      }
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+prospeo",
+      "url": "/?action=%s"
+    }
+  ],
+  "widgets": [
+    {
+      "name": "Prospeo Quick Add",
+      "description": "Quickly add a prospect from your home screen",
+      "tag": "quick-add",
+      "ms_ac_template": "widgets/quick-add.json",
+      "data": "widgets/quick-add-data.json",
+      "type": "application/json",
+      "screenshots": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "label": "Prospeo widget"
+        }
+      ],
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ],
+      "auth": false,
+      "update": 86400
     }
   ]
 }
