@@ -578,13 +578,67 @@ function AddView({ profile, isMobile, notify, lang="fr", onAdded }) {
   const [vocalText, setVocalText] = useState("");
   const [vocalAnalyzing, setVocalAnalyzing] = useState(false);
   const [showPWABanner, setShowPWABanner] = useState(false);
+  const [duplicate, setDuplicate]         = useState(null);
   const fileRef = useRef(null);
   const recRef  = useRef(null);
   const vocalRecRef = useRef(null);
-  const f = (k,v) => setForm(p=>({...p,[k]:v}));
+  const f = (k,v) => {
+    setForm(p => {
+      const updated = {...p,[k]:v};
+      // Check for duplicates when name or company changes
+      if (["first_name","last_name","company"].includes(k)) {
+        checkDuplicate(updated);
+      }
+      return updated;
+    });
+  };
+
+  const checkDuplicate = async (formData) => {
+    const { first_name, last_name, company } = formData;
+    if (!first_name || !last_name) { setDuplicate(null); return; }
+    try {
+      // Search all contacts (manager sees all, commercial sees own but we query all for duplicate check)
+      const { data } = await supabase
+        .from("contacts")
+        .select("*, profiles:user_id(full_name, first_name, last_name, email, role)")
+        .ilike("first_name", first_name.trim())
+        .ilike("last_name", last_name.trim());
+
+      if (!data || data.length === 0) { setDuplicate(null); return; }
+
+      // Filter by company if provided
+      const matches = company
+        ? data.filter(c => c.company?.toLowerCase().includes(company.toLowerCase().trim()))
+        : data;
+
+      if (matches.length === 0) { setDuplicate(null); return; }
+
+      // Found duplicate
+      const dup = matches[0];
+      const owner = dup.profiles;
+      const ownerName = owner?.first_name && owner?.last_name
+        ? `${owner.first_name} ${owner.last_name}`
+        : owner?.full_name || owner?.email || "un autre utilisateur";
+      const ownerRole = owner?.role === "manager" ? "Manager" : "Commercial";
+
+      setDuplicate({
+        contact: dup,
+        ownerName,
+        ownerRole,
+        isOwn: dup.user_id === profile.id,
+      });
+    } catch { setDuplicate(null); }
+  };
 
   const submit = async () => {
     if (!form.first_name||!form.last_name) { notify("Prénom et nom requis","error"); return; }
+
+    // Block if duplicate detected (except for managers who can override)
+    if (duplicate && profile?.role !== "manager") {
+      notify("⚠️ Ce prospect existe déjà dans la base", "error");
+      return;
+    }
+
     const { data: newContact, error } = await supabase
       .from("contacts").insert({...form, user_id:profile.id}).select().single();
     if (error) { notify("Erreur enregistrement","error"); return; }
@@ -602,6 +656,7 @@ function AddView({ profile, isMobile, notify, lang="fr", onAdded }) {
     }
 
     setForm({ first_name:"", last_name:"", company:"", role:"", email:"", phone:"", source:"manuel", notes:"", status:"froid" });
+    setDuplicate(null);
     onAdded();
   };
 
@@ -798,6 +853,42 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
       </div>
       <input ref={fileRef} type="file" accept="image/*" style={{ display:"none" }} onChange={scanCard} />
       {analyzing && <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 18px", background:"#FFF8F4", border:"2px solid #FF4C1A", borderRadius:10, marginBottom:18, fontFamily:"'Helvetica Neue',sans-serif", fontSize:13, color:"#FF4C1A" }}><div style={{ width:16, height:16, border:"3px solid #FFD4C4", borderTopColor:"#FF4C1A", borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /><span>Analyse IA...</span></div>}
+
+      {duplicate && (
+        <div style={{ background: duplicate.isOwn ? "#FFF8F4" : "#FFF3F3", border:`2px solid ${duplicate.isOwn?"#FF9500":"#FF2D2D"}`, borderRadius:12, padding:16, marginBottom:16 }}>
+          <div style={{ display:"flex", alignItems:"flex-start", gap:10 }}>
+            <span style={{ fontSize:20, flexShrink:0 }}>{duplicate.isOwn ? "⚠️" : "🚫"}</span>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:14, fontWeight:700, color: duplicate.isOwn?"#FF9500":"#FF2D2D", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:4 }}>
+                {duplicate.isOwn ? "Prospect déjà dans votre base" : "Prospect déjà enregistré"}
+              </div>
+              <div style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif", lineHeight:1.5 }}>
+                <strong>{duplicate.contact.first_name} {duplicate.contact.last_name}</strong>
+                {duplicate.contact.company ? ` · ${duplicate.contact.company}` : ""}
+                {" "}est déjà dans la base, affilié à{" "}
+                <strong>{duplicate.isOwn ? "vous-même" : `${duplicate.ownerRole} ${duplicate.ownerName}`}</strong>.
+              </div>
+              {duplicate.contact.status && (
+                <div style={{ marginTop:6, display:"flex", alignItems:"center", gap:6 }}>
+                  <div style={{ ...SB, background:STATUS_COLORS[duplicate.contact.status]?.bg, color:STATUS_COLORS[duplicate.contact.status]?.text, fontSize:10 }}>
+                    {STATUS_COLORS[duplicate.contact.status]?.label}
+                  </div>
+                  <span style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>
+                    Ajouté le {new Date(duplicate.contact.created_at).toLocaleDateString("fr-FR")}
+                  </span>
+                </div>
+              )}
+              {profile?.role === "manager" && (
+                <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginTop:6, fontStyle:"italic" }}>
+                  En tant que Manager, vous pouvez quand même enregistrer ce prospect.
+                </div>
+              )}
+            </div>
+            <button style={{ border:"none", background:"transparent", color:"#aaa", cursor:"pointer", fontSize:16, flexShrink:0, padding:0 }}
+              onClick={()=>setDuplicate(null)}>✕</button>
+          </div>
+        </div>
+      )}
 
       {vocalFull && (
         <div style={{ background:"#1A1A1A", borderRadius:16, padding:20, marginBottom:20 }}>
@@ -1268,7 +1359,53 @@ function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, onUpdat
   });
   const [saving, setSaving]   = useState(false);
   const [loading, setLoading] = useState(true);
-  const f = (k,v) => setForm(p=>({...p,[k]:v}));
+  const f = (k,v) => {
+    setForm(p => {
+      const updated = {...p,[k]:v};
+      // Check for duplicates when name or company changes
+      if (["first_name","last_name","company"].includes(k)) {
+        checkDuplicate(updated);
+      }
+      return updated;
+    });
+  };
+
+  const checkDuplicate = async (formData) => {
+    const { first_name, last_name, company } = formData;
+    if (!first_name || !last_name) { setDuplicate(null); return; }
+    try {
+      // Search all contacts (manager sees all, commercial sees own but we query all for duplicate check)
+      const { data } = await supabase
+        .from("contacts")
+        .select("*, profiles:user_id(full_name, first_name, last_name, email, role)")
+        .ilike("first_name", first_name.trim())
+        .ilike("last_name", last_name.trim());
+
+      if (!data || data.length === 0) { setDuplicate(null); return; }
+
+      // Filter by company if provided
+      const matches = company
+        ? data.filter(c => c.company?.toLowerCase().includes(company.toLowerCase().trim()))
+        : data;
+
+      if (matches.length === 0) { setDuplicate(null); return; }
+
+      // Found duplicate
+      const dup = matches[0];
+      const owner = dup.profiles;
+      const ownerName = owner?.first_name && owner?.last_name
+        ? `${owner.first_name} ${owner.last_name}`
+        : owner?.full_name || owner?.email || "un autre utilisateur";
+      const ownerRole = owner?.role === "manager" ? "Manager" : "Commercial";
+
+      setDuplicate({
+        contact: dup,
+        ownerName,
+        ownerRole,
+        isOwn: dup.user_id === profile.id,
+      });
+    } catch { setDuplicate(null); }
+  };
 
   // Recharge depuis Supabase à chaque fois que l'onglet est ouvert
   useEffect(() => {
