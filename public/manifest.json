@@ -1,15 +1,15 @@
 {
   "id": "com.prospeo.app",
-  "name": "Prospeo — Gestion de Prospects",
+  "name": "Prospeo — Prospect Management",
   "short_name": "Prospeo",
-  "description": "Capturez, qualifiez et convertissez vos prospects terrain. Scan carte IA, dictée vocale, rapports en temps réel.",
+  "description": "Capture, qualify and convert your field prospects. AI business card scan, voice dictation, real-time reports.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#1A1A1A",
   "theme_color": "#FF4C1A",
-  "lang": "fr",
+  "lang": "en",
   "dir": "ltr",
   "categories": ["business", "productivity"],
   "prefer_related_applications": false,
@@ -25,31 +25,38 @@
   ],
   "screenshots": [
     {
-      "src": "/icons/screenshot-mobile.png",
+      "src": "/icons/screenshot-mobile-1.png",
       "sizes": "1080x1920",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Tableau de bord Prospeo"
+      "label": "Prospeo Dashboard"
     },
     {
-      "src": "/icons/screenshot-desktop.png",
+      "src": "/icons/screenshot-mobile-2.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Add a prospect"
+    },
+    {
+      "src": "/icons/screenshot-desktop-1.png",
       "sizes": "1920x1080",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Gestion de prospects terrain"
+      "label": "Field prospect management — Reports and Export"
     }
   ],
   "shortcuts": [
     {
-      "name": "Ajouter un prospect",
-      "short_name": "Ajouter",
-      "description": "Ajouter rapidement un nouveau prospect manuellement, avec une carte de visite ou en dictant vocalement les informations",
+      "name": "Add a prospect",
+      "short_name": "Add",
+      "description": "Quickly add a new prospect manually, by scanning a business card or by voice dictation",
       "url": "/?action=add"
     },
     {
-      "name": "Tableau de bord",
+      "name": "Dashboard",
       "short_name": "Dashboard",
-      "description": "Centralise les informations du commercial et du manager en temps réel",
+      "description": "Centralizes sales rep and manager information in real time",
       "url": "/"
     }
   ]
