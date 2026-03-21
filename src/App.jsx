@@ -174,7 +174,7 @@ export default function App() {
   return <ProspeoApp profile={profile} onSignOut={() => supabase.auth.signOut()} lang={lang} changeLang={changeLang} />;
 }
 
-function AuthPage() {
+function AuthPage({ lang="fr", changeLang }) {
   const [mode, setMode]       = useState("login");
   const [email, setEmail]     = useState("");
   const [password, setPwd]    = useState("");
@@ -203,12 +203,12 @@ function AuthPage() {
           <span style={{ fontSize:26, color:"#FF4C1A" }}>◈</span>
           <span style={{ fontSize:20, fontWeight:700, letterSpacing:3, color:"#1A1A1A", fontFamily:"'Helvetica Neue',sans-serif" }}>PROSPEO</span>
         </div>
-        <h2 style={{ fontSize:22, fontWeight:400, color:"#1A1A1A", margin:"0 0 24px", fontFamily:"Georgia,serif" }}>{mode === "login" ? "Connexion" : "Créer un compte"}</h2>
+        <h2 style={{ fontSize:22, fontWeight:400, color:"#1A1A1A", margin:"0 0 24px", fontFamily:"Georgia,serif" }}>{mode === "login" ? t("login",lang) : t("register",lang)}</h2>
         {mode === "register" && <div style={{ marginBottom:14 }}><label style={L}>Nom complet</label><input style={I} placeholder="Jean Dupont" value={name} onChange={e=>setName(e.target.value)} /></div>}
         <div style={{ marginBottom:14 }}><label style={L}>Email</label><input style={I} type="email" placeholder="jean@entreprise.fr" value={email} onChange={e=>setEmail(e.target.value)} /></div>
         <div style={{ marginBottom:14 }}><label style={L}>Mot de passe</label><input style={I} type="password" placeholder="••••••••" value={password} onChange={e=>setPwd(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} /></div>
         {error && <div style={{ padding:"10px 14px", borderRadius:8, background:error.startsWith("✅")?"#EBF8F4":"#FFF0F0", color:error.startsWith("✅")?"#00875A":"#FF2D2D", fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", marginBottom:14 }}>{error}</div>}
-        <button style={{ width:"100%", padding:"14px", background:"#1A1A1A", color:"#E8E0D4", border:"none", borderRadius:10, cursor:"pointer", fontSize:15, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }} onClick={submit} disabled={busy}>{busy?"Chargement...":mode==="login"?"Se connecter":"Créer le compte"}</button>
+        <button style={{ width:"100%", padding:"14px", background:"#1A1A1A", color:"#E8E0D4", border:"none", borderRadius:10, cursor:"pointer", fontSize:15, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }} onClick={submit} disabled={busy}>{busy?"Chargement...":mode==="login"?t("login",lang):t("register",lang)}</button>
         <button style={{ display:"block", marginTop:14, border:"none", background:"none", color:"#888", cursor:"pointer", fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", width:"100%", textAlign:"center", padding:"8px" }} onClick={()=>{setMode(mode==="login"?"register":"login");setError("");}}>
           {mode==="login"?"Pas encore de compte ? S'inscrire":"Déjà un compte ? Se connecter"}
         </button>
@@ -358,7 +358,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
         {view==="profile"       && <ProfileView profile={profile} isMobile={isMobile} notify={notify} lang={lang} changeLang={changeLang} onUpdated={(p)=>{ setProfile(p); }} />}
         {view==="subscription"  && <SubscriptionView profile={profile} subscription={subscription} isMobile={isMobile} lang={lang} notify={notify} onActivated={loadSubscription} />}
         {view==="activate"      && <ActivateKeyView profile={profile} isMobile={isMobile} notify={notify} onActivated={()=>{ loadSubscription(); setView("dashboard"); }} />}
-        {view==="superadmin" && isSuperManager(profile) && <SuperAdminView profile={profile} isMobile={isMobile} notify={notify} />}
+        {view==="superadmin" && isSuperManager(profile) && <SuperAdminView profile={profile} isMobile={isMobile} lang={lang} notify={notify} />}
         {view==="crm"         && <CRMConfigView profile={profile} isMobile={isMobile} lang={lang} notify={notify} />}
       </main>
 
@@ -631,7 +631,7 @@ function AddView({ profile, isMobile, notify, lang="fr", onAdded }) {
   };
 
   const submit = async () => {
-    if (!form.first_name||!form.last_name) { notify("Prénom et nom requis","error"); return; }
+    if (!form.first_name||!form.last_name) { notify("First name and last name required","error"); return; }
 
     // Block if duplicate detected (except for managers who can override)
     if (duplicate && profile?.role !== "manager") {
@@ -671,7 +671,7 @@ function AddView({ profile, isMobile, notify, lang="fr", onAdded }) {
         const parsed = JSON.parse(text.replace(/```json|```/g,"").trim());
         setForm(p=>({...p,...parsed,source:"carte"}));
         notify("📇 Carte analysée !");
-      } catch { notify("Erreur IA","error"); }
+      } catch { notify(t("error",lang),"error"); }
       setAnalyzing(false);
     };
     reader.readAsDataURL(file);
@@ -968,7 +968,7 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
       <div style={{ marginBottom:14 }}>
         <label style={L}>Notes</label>
         <div style={{ display:"flex", gap:8 }}>
-          <textarea style={{ ...I, minHeight:85, resize:"vertical" }} placeholder="Besoins, contexte, prochaines étapes..." value={form.notes} onChange={e=>f("notes",e.target.value)} />
+          <textarea style={{ ...I, minHeight:85, resize:"vertical" }} placeholder="..." value={form.notes} onChange={e=>f("notes",e.target.value)} />
           <button style={{ width:43, height:43, border:`2px solid ${rec&&recF==="notes"?"#FF4C1A":"#E8E0D4"}`, borderRadius:8, background:rec&&recF==="notes"?"#FF4C1A":"#fff", cursor:"pointer", fontSize:15, flexShrink:0, alignSelf:"flex-start" }}
             onClick={()=>rec&&recF==="notes"?stopVoice():startVoice("notes")}>
             🎙️
@@ -1075,8 +1075,8 @@ function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBa
       .eq("id", c.id)
       .select()
       .single();
-    if (error) { notify("Erreur lors de la sauvegarde","error"); }
-    else { setC({ ...c, ...data }); setEditing(false); notify("✅ Prospect mis à jour !"); }
+    if (error) { notify("Error saving","error"); }
+    else { setC({ ...c, ...data }); setEditing(false); notify(t("profile_updated",lang)); }
     setSaving(false);
   };
 
@@ -1086,8 +1086,8 @@ function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBa
       const content = await callClaude([{ role:"user", content:`Synthèse commerciale (3-4 phrases) en français pour : ${JSON.stringify(c)}. Potentiel, points clés, prochaines actions.` }]);
       await supabase.from("syntheses").insert({ contact_id:c.id, user_id:profile.id, content });
       setSyn(content); setPast(p=>[{content,created_at:new Date().toISOString()},...p]);
-      notify("✨ Synthèse générée !");
-    } catch { notify("Erreur IA","error"); }
+      notify("✨ " + t("ai_synthesis",lang));
+    } catch { notify(t("error",lang),"error"); }
     setSynLoad(false);
   };
 
@@ -1110,7 +1110,7 @@ function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBa
               { k:"last_name",  l:"Nom *",       ph:"Dupont" },
               { k:"company",    l:"Entreprise",  ph:"Acme Corp" },
               { k:"role",       l:"Poste",       ph:"Directeur Commercial" },
-              { k:"email",      l:"Email",       ph:"jean@acme.fr" },
+              { k:"email",      l:t("email",lang),       ph:"jean@acme.fr" },
               { k:"phone",      l:"Téléphone",   ph:"+33 6 00 00 00 00" },
             ].map(field => (
               <div key={field.k}>
@@ -1121,12 +1121,12 @@ function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBa
           </div>
           <div style={{ marginBottom:14 }}>
             <label style={L}>Notes</label>
-            <textarea style={{ ...I, minHeight:80, resize:"vertical" }} placeholder="Besoins, contexte, prochaines étapes..." value={editForm.notes} onChange={e=>ef("notes",e.target.value)} />
+            <textarea style={{ ...I, minHeight:80, resize:"vertical" }} placeholder="..." value={editForm.notes} onChange={e=>ef("notes",e.target.value)} />
           </div>
           <div style={{ display:"flex", gap:10 }}>
             <button style={{ ...BS, flex:1 }} onClick={()=>setEditing(false)}>Annuler</button>
             <button style={{ ...BP, flex:1 }} onClick={saveEdit} disabled={saving}>
-              {saving ? "Sauvegarde..." : t("save",lang)}
+              {saving ? t("saving",lang) : t("save",lang)}
             </button>
           </div>
         </div>
@@ -1160,7 +1160,7 @@ function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBa
       </div>
 
       <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:10, marginBottom:14 }}>
-        {[{icon:"✉️",label:"Email",value:c.email},{icon:"📞",label:"Téléphone",value:c.phone},{icon:"🏢",label:"Entreprise",value:c.company},{icon:"📅",label:"Date",value:new Date(c.created_at).toLocaleDateString("fr-FR")}]
+        {[{icon:"✉️",label:t("email",lang),value:c.email},{icon:"📞",label:"Téléphone",value:c.phone},{icon:"🏢",label:"Entreprise",value:c.company},{icon:"📅",label:"Date",value:new Date(c.created_at).toLocaleDateString("fr-FR")}]
           .filter(r=>r.value).map(row=>(
           <div key={row.label} style={{ display:"flex", gap:11, alignItems:"flex-start", padding:13, background:"#fff", borderRadius:10 }}>
             <span style={{ fontSize:17 }}>{row.icon}</span>
@@ -1228,7 +1228,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
   };
 
   const exportExcel = () => {
-    let csv = ["Prénom","Nom","Entreprise","Poste","Email","Téléphone","Source","Statut","Notes","Commercial","Date"].join(";")+"\n";
+    let csv = ["Prénom","Nom","Entreprise","Poste",t("email",lang),"Téléphone","Source",t("status",lang),"Notes","Commercial","Date"].join(";")+"\n";
     filtered.forEach(c=>{ csv+=[c.first_name,c.last_name,c.company,c.role,c.email,c.phone,c.source,c.status,c.notes,c.profiles?.full_name||"",new Date(c.created_at).toLocaleDateString("fr-FR")].map(v=>`"${String(v||"").replace(/"/g,'""')}"`).join(";")+"\n"; });
     const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"})); a.download=`prospects_${period}_${new Date().toISOString().split("T")[0]}.csv`; a.click();
     notify("📊 Export téléchargé !");
@@ -1236,7 +1236,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
 
   return (
     <div style={P(isMobile)}>
-      <h1 style={T(isMobile)}>Rapport & Export</h1>
+      <h1 style={T(isMobile)}>{t("report_title",lang)}</h1>
 
       <div style={{ display:"flex", gap:6, marginBottom:14, overflowX:"auto", paddingBottom:4 }}>
         {getPeriods(lang).map(p=>(
@@ -1539,7 +1539,7 @@ function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, onUpdat
   );
 }
 
-function SubscriptionView({ profile, subscription, isMobile, notify, onActivated }) {
+function SubscriptionView({ profile, subscription, isMobile, lang="fr", notify, onActivated }) {
   const [addQtyMore, setAddQtyMore] = useState(1);
   const [addingMore, setAddingMore]  = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1609,7 +1609,7 @@ function SubscriptionView({ profile, subscription, isMobile, notify, onActivated
               ))}
             </div>
             <button style={{ ...BP, width:"100%", padding:"14px", background:"#FF4C1A", fontSize:15 }} onClick={()=>subscribe("annual")} disabled={loading}>
-              {loading ? "Redirection vers le paiement..." : "S'abonner — 59,88€ HT / an →"}
+              {loading ? t("loading",lang) : "S'abonner — 59,88€ HT / an →"}
             </button>
             <div style={{ fontSize:11, color:"#AAAAAA", fontFamily:"'Helvetica Neue',sans-serif", textAlign:"center", marginTop:10 }}>
               🎁 Essai gratuit 7 jours inclus · Sans carte bancaire requise
@@ -1666,18 +1666,18 @@ function SubscriptionView({ profile, subscription, isMobile, notify, onActivated
         <button style={{ ...BS, width:"100%" }} onClick={()=>setShowActivate(!showActivate)}>
           🔑 Activer une clé
         </button>
-        {showActivate && <ActivateKeyView profile={profile} isMobile={isMobile} notify={notify} onActivated={onActivated} inline />}
+        {showActivate && <ActivateKeyView profile={profile} isMobile={isMobile} lang={lang} notify={notify} onActivated={onActivated} inline />}
       </div>
     </div>
   );
 }
 
-function ActivateKeyView({ profile, isMobile, notify, onActivated, inline }) {
+function ActivateKeyView({ profile, isMobile, lang="fr", notify, onActivated, inline }) {
   const [key, setKey]       = useState("");
   const [loading, setLoading] = useState(false);
 
   const activate = async () => {
-    if (!key.trim()) { notify("Entrez une clé d'activation","error"); return; }
+    if (!key.trim()) { notify(t("activate_key",lang),"error"); return; }
     setLoading(true);
     try {
       const res = await fetch("/api/activate-key", {
@@ -1690,7 +1690,7 @@ function ActivateKeyView({ profile, isMobile, notify, onActivated, inline }) {
         notify("🎉 " + data.message);
         onActivated();
       } else {
-        notify(data.error || "Clé invalide","error");
+        notify(data.error || t("error",lang),"error");
       }
     } catch (err) { notify("Erreur : " + err.message,"error"); }
     setLoading(false);
@@ -1708,14 +1708,14 @@ function ActivateKeyView({ profile, isMobile, notify, onActivated, inline }) {
           onKeyDown={e=>e.key==="Enter"&&activate()}
         />
         <button style={{ ...BP, width:"100%" }} onClick={activate} disabled={loading||!key.trim()}>
-          {loading?"Activation...":"🔑 Activer mon abonnement"}
+          {loading?t("loading",lang):t("activate_btn",lang)}
         </button>
       </div>
     </div>
   );
 }
 
-function CRMConfigView({ profile, isMobile, notify }) {
+function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
   const [configs, setConfigs]   = useState([]);
   const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -1727,7 +1727,7 @@ function CRMConfigView({ profile, isMobile, notify }) {
     { id:"salesforce", label:"Salesforce", fields:[{k:"instance_url",l:"URL Instance (ex: https://xxx.salesforce.com)"},{k:"client_id",l:"Client ID"},{k:"client_secret",l:"Client Secret"},{k:"username",l:"Username"},{k:"password",l:"Password"},{k:"security_token",l:"Security Token"}] },
     { id:"pipedrive",  label:"Pipedrive",  fields:[{k:"api_key",l:"API Token"}] },
     { id:"zoho",       label:"Zoho CRM",   fields:[{k:"access_token",l:"Access Token OAuth2"}] },
-    { id:"odoo",       label:"Odoo",       fields:[{k:"url",l:"URL Odoo (ex: https://monodoo.com)"},{k:"db",l:"Nom base de données"},{k:"username",l:"Email utilisateur"},{k:"password",l:"Mot de passe"}] },
+    { id:"odoo",       label:"Odoo",       fields:[{k:"url",l:"URL Odoo (ex: https://monodoo.com)"},{k:"db",l:"Nom base de données"},{k:"username",l:"Email utilisateur"},{k:"password",l:t("password",lang)}] },
     { id:"generic",    label:"CRM Générique / Webhook", fields:[{k:"webhook_url",l:"URL Webhook (POST)"},{k:"api_key",l:"Clé API (Bearer token, optionnel)"},{k:"secret_key",l:"Secret Webhook (optionnel)"}] },
   ];
 
@@ -1764,7 +1764,7 @@ function CRMConfigView({ profile, isMobile, notify }) {
   const remove = async (id) => {
     await supabase.from("crm_configs").delete().eq("id", id);
     loadConfigs();
-    notify("Configuration supprimée");
+    notify("✅");
   };
 
   return (
@@ -1860,7 +1860,7 @@ function CRMConfigView({ profile, isMobile, notify }) {
                 {`{
   "first_name": "FirstName",
   "last_name": "LastName",
-  "email": "Email",
+  "email": t("email",lang),
   "phone": "Phone",
   "company": "Company"
 }`}
@@ -1872,7 +1872,7 @@ function CRMConfigView({ profile, isMobile, notify }) {
           <div style={{ display:"flex", gap:10, marginTop:16 }}>
             <button style={{ ...BS, flex:1 }} onClick={()=>setShowForm(false)}>Annuler</button>
             <button style={{ ...BP, flex:1 }} onClick={save} disabled={saving}>
-              {saving?"Sauvegarde...":"✅ Connecter ce CRM"}
+              {saving?t("saving",lang):"✅ " + t("crm_connect",lang)}
             </button>
           </div>
         </div>
@@ -1895,7 +1895,7 @@ function CRMConfigView({ profile, isMobile, notify }) {
   );
 }
 
-function SuperAdminView({ profile, isMobile, notify }) {
+function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
   const [data, setData]           = useState(null);
   const [loading, setLoading]     = useState(true);
   const [tab, setTab]             = useState("keys");
@@ -2326,7 +2326,7 @@ function ExpiredWall({ profile, subscription, isMobile, onActivate }) {
   };
 
   const activate = async () => {
-    if (!key.trim()) { showNotif("Entrez une clé d'activation", "error"); return; }
+    if (!key.trim()) { showNotif(t("activate_key",lang), "error"); return; }
     setLoading(true);
     try {
       const res = await fetch("/api/activate-key", {
@@ -2336,7 +2336,7 @@ function ExpiredWall({ profile, subscription, isMobile, onActivate }) {
       });
       const data = await res.json();
       if (data.success) { showNotif("✅ " + data.message); setTimeout(() => onActivate(), 1500); }
-      else showNotif(data.error || "Clé invalide", "error");
+      else showNotif(data.error || t("error",lang), "error");
     } catch(err) { showNotif("Erreur : " + err.message, "error"); }
     setLoading(false);
   };
@@ -2379,7 +2379,7 @@ function ExpiredWall({ profile, subscription, isMobile, onActivate }) {
         {/* Bouton paiement */}
         <button style={{ width:"100%", padding:"14px", background:"#FF4C1A", color:"#fff", border:"none", borderRadius:10, cursor:"pointer", fontSize:15, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:700, marginBottom:16 }}
           onClick={subscribe} disabled={loading}>
-          {loading ? "Redirection..." : "S'abonner maintenant →"}
+          {loading ? "Redirection..." : t("subscribe",lang)}
         </button>
 
         {/* Séparateur */}
