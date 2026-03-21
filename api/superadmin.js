@@ -179,6 +179,33 @@ export default async function handler(req, res) {
       });
     }
 
+    // ── GRANT LIFETIME LICENCE ─────────────────────────────
+    if (action === "grantLifetime") {
+      const { userId } = req.body;
+      if (!userId) return res.status(400).json({ error: "userId requis" });
+
+      // Date très lointaine = à vie (année 2099)
+      const lifetime = new Date("2099-12-31T23:59:59Z");
+
+      await supabase.from("subscriptions").upsert({
+        user_id: userId,
+        plan: "annual",
+        status: "lifetime",
+        current_period_end: lifetime.toISOString(),
+        stripe_customer_id: null,
+        stripe_sub_id: null,
+      }, { onConflict: "user_id" });
+
+      // Log dans les notes de la clé si besoin
+      console.log(`♾️ Licence à vie attribuée à userId: ${userId}`);
+
+      return res.status(200).json({
+        success: true,
+        message: "Licence gratuite à vie attribuée",
+        expires: lifetime.toISOString(),
+      });
+    }
+
     // ── DISABLE ACCOUNT ────────────────────────────────────
     if (action === "disableAccount") {
       const { userId } = req.body;
