@@ -209,7 +209,7 @@ function AuthPage({ lang="fr", changeLang }) {
         </div>
         <h2 style={{ fontSize:22, fontWeight:400, color:"#1A1A1A", margin:"0 0 24px", fontFamily:"Georgia,serif" }}>{mode === "login" ? t("login",lang) : t("register",lang)}</h2>
         {mode === "register" && <div style={{ marginBottom:14 }}><label style={L}>{t("first_name",lang)+" "+t("last_name",lang)}</label><input style={I} placeholder="Jean Dupont" value={name} onChange={e=>setName(e.target.value)} /></div>}
-        <div style={{ marginBottom:14 }}><label style={L}>Email</label><input style={I} type="email" placeholder="jean@entreprise.fr" value={email} onChange={e=>setEmail(e.target.value)} /></div>
+        <div style={{ marginBottom:14 }}><label style={L}>{t("email",lang)}</label><input style={I} type="email" placeholder="jean@entreprise.fr" value={email} onChange={e=>setEmail(e.target.value)} /></div>
         <div style={{ marginBottom:14 }}><label style={L}>Mot de passe</label><input style={I} type="password" placeholder="••••••••" value={password} onChange={e=>setPwd(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} /></div>
         {error && <div style={{ padding:"10px 14px", borderRadius:8, background:error.startsWith("✅")?"#EBF8F4":"#FFF0F0", color:error.startsWith("✅")?"#00875A":"#FF2D2D", fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", marginBottom:14 }}>{error}</div>}
         <button style={{ width:"100%", padding:"14px", background:"#1A1A1A", color:"#E8E0D4", border:"none", borderRadius:10, cursor:"pointer", fontSize:15, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }} onClick={submit} disabled={busy}>{busy?"Chargement...":mode==="login"?t("login",lang):t("register",lang)}</button>
@@ -418,7 +418,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
         if (subscription.status === "trial") return (
           <div style={{ background:"#E8F4FF", borderRadius:12, padding:14, marginBottom:16, display:"flex", alignItems:"center", gap:10 }}>
             <span style={{ fontSize:16 }}>🎁</span>
-            <div style={{ fontFamily:"'Helvetica Neue',sans-serif", fontSize:13, color:"#1A6AFF" }}>Période d'essai gratuite — {daysLeft} jour{daysLeft>1?"s":""} restant{daysLeft>1?"s":""}</div>
+            <div style={{ fontFamily:"'Helvetica Neue',sans-serif", fontSize:13, color:"#1A6AFF" }}>{t("trial_active",lang)} — {daysLeft} jour{daysLeft>1?"s":""} restant{daysLeft>1?"s":""}</div>
           </div>
         );
         return null;
@@ -1028,7 +1028,7 @@ function ListView({ contacts, profile, loadingData, isMobile, lang="fr", onSelec
       </div>
       <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
         {loadingData ? <div style={LT}>Chargement...</div> :
-          filtered.length===0 ? <div style={{ padding:40, textAlign:"center", color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif" }}>Aucun prospect trouvé</div> :
+          filtered.length===0 ? <div style={{ padding:40, textAlign:"center", color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif" }}>{t("no_prospects",lang)}</div> :
           filtered.map(c=>(
             <div key={c.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"13px 15px", background:"#fff", borderRadius:12, cursor:"pointer", boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }} onClick={()=>onSelect(c)}>
               <div style={AV}>{c.first_name[0]}{c.last_name[0]}</div>
@@ -1325,7 +1325,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
 
       <div style={{ ...C, marginBottom:14 }}>
         <h3 style={CT}>Contacts ({filtered.length})</h3>
-        {filtered.length===0 ? <div style={{ textAlign:"center", color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", padding:16 }}>Aucun prospect sur cette période</div> :
+        {filtered.length===0 ? <div style={{ textAlign:"center", color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", padding:16 }}>{t("no_prospects",lang)}</div> :
           filtered.map(c=>(
             <div key={c.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 0", borderBottom:"1px solid #F0EBE0", cursor:"pointer" }} onClick={()=>onSelectContact && onSelectContact(c)}>
               <div style={{ flex:1, minWidth:0 }}>
@@ -1353,7 +1353,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
             <textarea style={{ ...I, minHeight:70, marginBottom:14 }} defaultValue={`Total : ${stats.total} | Chauds : ${stats.chaud} | Convertis : ${stats.converti}`} />
             <div style={{ display:"flex", gap:10 }}>
               <button style={{ ...BS, flex:1 }} onClick={()=>setPreview(false)}>Annuler</button>
-              <button style={{ ...BP, flex:1 }} onClick={async()=>{ setSending(true); await new Promise(r=>setTimeout(r,1500)); setSending(false); notify("📧 Envoyé !"); setPreview(false); }} disabled={sending}>{sending?"Envoi...":"✉️ Envoyer"}</button>
+              <button style={{ ...BP, flex:1 }} onClick={async()=>{ setSending(true); await new Promise(r=>setTimeout(r,1500)); setSending(false); notify("📧 Envoyé !"); setPreview(false); }} disabled={sending}>{sending?t("loading",lang):"✉️ Envoyer"}</button>
             </div>
           </div>
         </div>
@@ -1581,7 +1581,7 @@ function SubscriptionView({ profile, subscription, isMobile, lang="fr", notify, 
     if (!subscription) return { text:"Chargement...", color:"#888" };
     if (subscription.status==="lifetime" || (subEnd && subEnd > new Date("2099-01-01"))) return { text:"♾️ Licence gratuite à vie", color:"#FF4C1A" };
     if (subscription.status==="active")    return { text:`✅ Actif — expire le ${subEnd?.toLocaleDateString("fr-FR")}`, color:"#00C48C" };
-    if (subscription.status==="trial")     return { text:`🎁 Essai gratuit — ${daysLeft} jour${daysLeft>1?"s":""} restant${daysLeft>1?"s":""}`, color:"#1A6AFF" };
+    if (subscription.status==="trial")     return { text:`🎁 ${t("trial_active",lang)} — ${daysLeft} jour${daysLeft>1?"s":""} restant${daysLeft>1?"s":""}`, color:"#1A6AFF" };
     if (subscription.status==="expired")   return { text:"❌ Expiré", color:"#FF2D2D" };
     if (subscription.status==="cancelled") return { text:"Annulé", color:"#888" };
     return { text:"Inconnu", color:"#888" };
@@ -1591,8 +1591,8 @@ function SubscriptionView({ profile, subscription, isMobile, lang="fr", notify, 
   return (
     <div style={P(isMobile)}>
       <div style={{ marginBottom:22 }}>
-        <h1 style={T(isMobile)}>Mon abonnement</h1>
-        <p style={Sub}>Gérez votre accès à Prospeo</p>
+        <h1 style={T(isMobile)}>{t("sub_title",lang)}</h1>
+        <p style={Sub}>{t("sub_status",lang)}</p>
       </div>
 
       {/* Statut actuel */}
@@ -1624,7 +1624,7 @@ function SubscriptionView({ profile, subscription, isMobile, lang="fr", notify, 
               {loading ? t("loading",lang) : "S'abonner — 59,88€ HT / an →"}
             </button>
             <div style={{ fontSize:11, color:"#AAAAAA", fontFamily:"'Helvetica Neue',sans-serif", textAlign:"center", marginTop:10 }}>
-              🎁 Essai gratuit 7 jours inclus · Sans carte bancaire requise
+              {t("free_trial_days",lang)} · Sans carte bancaire requise
             </div>
           </div>
         </div>
@@ -1665,7 +1665,7 @@ function SubscriptionView({ profile, subscription, isMobile, lang="fr", notify, 
               } catch(err){ notify("Erreur : "+err.message,"error"); }
               setAddingMore(false);
             }}>
-              {addingMore ? "Redirection..." : `Acheter ${addQtyMore} licence${addQtyMore>1?"s":""} →`}
+              {addingMore ? t("loading",lang) : `Acheter ${addQtyMore} licence${addQtyMore>1?"s":""} →`}
             </button>
           </div>
         </div>
@@ -1673,8 +1673,8 @@ function SubscriptionView({ profile, subscription, isMobile, lang="fr", notify, 
 
       {/* Activer une clé */}
       <div style={C}>
-        <h3 style={CT}>Vous avez une clé d'activation ?</h3>
-        <p style={{ fontSize:13, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 12px" }}>Entrez la clé reçue par email après votre paiement.</p>
+        <h3 style={CT}>{t("activate_key",lang)}</h3>
+        
         <button style={{ ...BS, width:"100%" }} onClick={()=>setShowActivate(!showActivate)}>
           🔑 Activer une clé
         </button>
@@ -2674,7 +2674,7 @@ function ExpiredWall({ profile, subscription, isMobile, onActivate }) {
         {/* Bouton paiement */}
         <button style={{ width:"100%", padding:"14px", background:"#FF4C1A", color:"#fff", border:"none", borderRadius:10, cursor:"pointer", fontSize:15, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:700, marginBottom:16 }}
           onClick={subscribe} disabled={loading}>
-          {loading ? "Redirection..." : t("subscribe",lang)}
+          {loading ? t("loading",lang) : t("subscribe",lang)}
         </button>
 
         {/* Séparateur */}
