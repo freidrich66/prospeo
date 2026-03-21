@@ -108,6 +108,77 @@ export default async function handler(req, res) {
       });
     }
 
+    // ── ADD LICENCES TO EXISTING COMPANY ──────────────────
+    if (action === "addLicences") {
+      const { companyId, quantity = 1, notes, trialDays = 0 } = req.body;
+      if (!companyId) return res.status(400).json({ error: "companyId requis" });
+
+      const qty = Math.max(1, parseInt(quantity));
+      const expiresAt = new Date();
+      if (trialDays > 0) {
+        expiresAt.setDate(expiresAt.getDate() + trialDays);
+      } else {
+        expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      }
+      const keyPlan = trialDays > 0 ? "trial" : "annual";
+      const trialSuffix = trialDays > 0 ? ` [ESSAI ${trialDays} jours]` : "";
+
+      // Get existing batch_id for this company to keep them grouped
+      const { data: existingKeys } = await supabase
+        .from("activation_keys")
+        .select("batch_id")
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: true })
+        .limit(1);
+
+      const batchId = existingKeys?.[0]?.batch_id || crypto.randomUUID();
+
+      // Add commercial licences only (manager already exists)
+      const keysToInsert = [];
+      for (let i = 0; i < qty; i++) {
+        keysToInsert.push({
+          key: genKey(),
+          email: null,
+          company_id: companyId,
+          batch_id: batchId,
+          key_type: "commercial",
+          plan: keyPlan,
+          notes: (notes || `Extension — Licence Commercial ${i + 1}`) + trialSuffix,
+          expires_at: expiresAt.toISOString(),
+        });
+      }
+
+      const { data, error } = await supabase
+        .from("activation_keys")
+        .insert(keysToInsert)
+        .select();
+
+      if (error) return res.status(500).json({ error: error.message });
+
+      // Update company licence count
+      await supabase
+        .from("companies")
+        .update({ licence_count: supabase.rpc ? undefined : undefined })
+        .eq("id", companyId);
+
+      // Get updated count
+      const { data: allKeys } = await supabase
+        .from("activation_keys")
+        .select("id")
+        .eq("company_id", companyId);
+
+      await supabase
+        .from("companies")
+        .update({ licence_count: allKeys?.length || qty })
+        .eq("id", companyId);
+
+      return res.status(200).json({
+        success: true,
+        keys: data.map(k => ({ key: k.key, type: k.key_type, batch: k.batch_id })),
+        message: `${qty} licence(s) Commercial ajoutée(s) au compte existant`,
+      });
+    }
+
     // ── DISABLE ACCOUNT ────────────────────────────────────
     if (action === "disableAccount") {
       const { userId } = req.body;
