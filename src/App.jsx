@@ -350,7 +350,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
 
       {/* Main */}
       <main style={{ flex:1, overflow:"auto", paddingTop:isMobile?54:0, paddingBottom:isMobile?68:0 }}>
-        {view==="dashboard" && <DashboardView contacts={contacts} stats={stats} loadingData={loadingData} profile={profile} isMobile={isMobile} go={go} lang={lang} globalSearch={globalSearch} setGlobalSearch={setGlobalSearch} onSelect={c=>{setSelected(c);setView("detail");}} />}
+        {view==="dashboard" && <DashboardView contacts={contacts} stats={stats} loadingData={loadingData} profile={profile} isMobile={isMobile} go={go} lang={lang} subscription={subscription} globalSearch={globalSearch} setGlobalSearch={setGlobalSearch} onSelect={c=>{setSelected(c);setView("detail");}} />}
         {view==="add"       && <AddView profile={profile} isMobile={isMobile} notify={notify} onAdded={()=>{loadContacts();setView("list");}} />}
         {view==="list"      && <ListView contacts={contacts} profile={profile} loadingData={loadingData} isMobile={isMobile} lang={lang} onSelect={c=>{setSelected(c);setView("detail");}} onAdd={()=>go("add")} />}
         {view==="detail" && selected && <DetailView contact={selected} profile={profile} isMobile={isMobile} lang={lang} onBack={()=>setView("list")} onStatusUpdate={handleStatusUpdate} onDelete={handleDelete} notify={notify} />}
@@ -377,7 +377,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
   );
 }
 
-function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, lang="fr", globalSearch="", setGlobalSearch, onSelect }) {
+function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, lang="fr", subscription=null, globalSearch="", setGlobalSearch, onSelect }) {
   return (
     <div style={P(isMobile)}>
       <div style={{ marginBottom:22 }}>
@@ -1384,6 +1384,8 @@ function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, onUpdat
 }
 
 function SubscriptionView({ profile, subscription, isMobile, notify, onActivated }) {
+  const [addQtyMore, setAddQtyMore] = useState(1);
+  const [addingMore, setAddingMore]  = useState(false);
   const [loading, setLoading] = useState(false);
   const [showActivate, setShowActivate] = useState(false);
 
@@ -1474,51 +1476,37 @@ function SubscriptionView({ profile, subscription, isMobile, notify, onActivated
           <p style={{ fontSize:13, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 12px", lineHeight:1.5 }}>
             Ajoutez des licences supplémentaires pour vos commerciaux. Chaque licence = 59,88€ HT/an.
           </p>
-          {(() => {
-            const [addQtyLocal, setAddQtyLocal] = React.useState(1);
-            const [addingLicence, setAddingLicence] = React.useState(false);
-            const buyMore = async () => {
-              setAddingLicence(true);
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+              <button style={{ width:34, height:34, border:"2px solid #E8E0D4", borderRadius:8, background:"#fff", cursor:"pointer", fontSize:16, fontWeight:700 }}
+                onClick={()=>setAddQtyMore(q=>Math.max(1,q-1))}>−</button>
+              <div style={{ textAlign:"center", minWidth:60 }}>
+                <div style={{ fontSize:22, fontWeight:700, color:"#1A1A1A" }}>{addQtyMore}</div>
+                <div style={{ fontSize:10, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>licence{addQtyMore>1?"s":""}</div>
+              </div>
+              <button style={{ width:34, height:34, border:"2px solid #E8E0D4", borderRadius:8, background:"#fff", cursor:"pointer", fontSize:16, fontWeight:700 }}
+                onClick={()=>setAddQtyMore(q=>Math.min(50,q+1))}>+</button>
+              <div style={{ flex:1, padding:"10px 14px", background:"#F5F0E8", borderRadius:10, fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>
+                <strong>{(addQtyMore * 59.88).toFixed(2)}€ HT</strong>
+                <div style={{ fontSize:10, color:"#888" }}>{addQtyMore} × 59,88€/an</div>
+              </div>
+            </div>
+            <button style={{ ...BP, width:"100%" }} disabled={addingMore} onClick={async()=>{
+              setAddingMore(true);
               try {
                 const res = await fetch("/api/stripe-checkout", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    email: profile.email,
-                    userId: profile.id,
-                    quantity: addQtyLocal,
-                    companyName: profile.company || "",
-                    addToExisting: true,
-                  }),
+                  method:"POST", headers:{"Content-Type":"application/json"},
+                  body:JSON.stringify({ email:profile.email, userId:profile.id, quantity:addQtyMore, companyName:profile.company||"", addToExisting:true }),
                 });
                 const data = await res.json();
                 if (data.url) window.location.href = data.url;
-                else notify("Erreur : " + data.error, "error");
-              } catch(err) { notify("Erreur : " + err.message, "error"); }
-              setAddingLicence(false);
-            };
-            return (
-              <div>
-                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
-                  <button style={{ width:34, height:34, border:"2px solid #E8E0D4", borderRadius:8, background:"#fff", cursor:"pointer", fontSize:16, fontWeight:700 }}
-                    onClick={()=>setAddQtyLocal(q=>Math.max(1,q-1))}>−</button>
-                  <div style={{ textAlign:"center", minWidth:60 }}>
-                    <div style={{ fontSize:22, fontWeight:700, color:"#1A1A1A" }}>{addQtyLocal}</div>
-                    <div style={{ fontSize:10, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>licence{addQtyLocal>1?"s":""}</div>
-                  </div>
-                  <button style={{ width:34, height:34, border:"2px solid #E8E0D4", borderRadius:8, background:"#fff", cursor:"pointer", fontSize:16, fontWeight:700 }}
-                    onClick={()=>setAddQtyLocal(q=>Math.min(50,q+1))}>+</button>
-                  <div style={{ flex:1, padding:"10px 14px", background:"#F5F0E8", borderRadius:10, fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>
-                    <strong>{(addQtyLocal * 59.88).toFixed(2)}€ HT</strong>
-                    <div style={{ fontSize:10, color:"#888" }}>{addQtyLocal} × 59,88€/an</div>
-                  </div>
-                </div>
-                <button style={{ ...BP, width:"100%" }} onClick={buyMore} disabled={addingLicence}>
-                  {addingLicence ? "Redirection..." : `Acheter ${addQtyLocal} licence${addQtyLocal>1?"s":""} →`}
-                </button>
-              </div>
-            );
-          })()}
+                else notify("Erreur : "+data.error,"error");
+              } catch(err){ notify("Erreur : "+err.message,"error"); }
+              setAddingMore(false);
+            }}>
+              {addingMore ? "Redirection..." : `Acheter ${addQtyMore} licence${addQtyMore>1?"s":""} →`}
+            </button>
+          </div>
         </div>
       )}
 
