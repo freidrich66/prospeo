@@ -1274,21 +1274,40 @@ function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, onUpdat
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", profile.id)
-        .single();
-      if (data) {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", profile.id)
+          .single();
+        if (data) {
+          setForm({
+            first_name: data.first_name || "",
+            last_name:  data.last_name  || "",
+            company:    data.company    || "",
+            phone:      data.phone      || "",
+          });
+          onUpdated({ ...profile, ...data });
+        } else {
+          // Si la lecture échoue, on utilise les données du profil en mémoire
+          setForm({
+            first_name: profile.first_name || "",
+            last_name:  profile.last_name  || "",
+            company:    profile.company    || "",
+            phone:      profile.phone      || "",
+          });
+        }
+      } catch(e) {
+        // Fallback sur les données en mémoire
         setForm({
-          first_name: data.first_name || "",
-          last_name:  data.last_name  || "",
-          company:    data.company    || "",
-          phone:      data.phone      || "",
+          first_name: profile.first_name || "",
+          last_name:  profile.last_name  || "",
+          company:    profile.company    || "",
+          phone:      profile.phone      || "",
         });
-        onUpdated({ ...profile, ...data });
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     load();
   }, [profile.id]);
