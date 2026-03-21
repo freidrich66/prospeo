@@ -1456,33 +1456,25 @@ function SubscriptionView({ profile, subscription, isMobile, notify, onActivated
       {(subscription?.status !== "active") && (
         <div style={{ marginBottom:16 }}>
           <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, textTransform:"uppercase", letterSpacing:1, marginBottom:12 }}>Choisissez votre offre</div>
-          <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:12 }}>
-
-            {/* Mensuel */}
-            <div style={{ background:"#fff", borderRadius:14, padding:20, border:"2px solid #E8E0D4" }}>
-              <div style={{ fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#888", marginBottom:8 }}>Mensuel</div>
-              <div style={{ fontSize:28, fontWeight:700, color:"#1A1A1A", fontFamily:"'Helvetica Neue',sans-serif" }}>4,99€ HT<span style={{ fontSize:14, fontWeight:400, color:"#888" }}>/mois</span></div>
-              <div style={{ fontSize:12, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4, marginBottom:16 }}>Sans engagement</div>
-              {["Prospects illimités","Scan carte IA","Synthèse IA","Export Excel","Rapports"].map(f=>(
-                <div key={f} style={{ fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#444", marginBottom:6 }}>✓ {f}</div>
-              ))}
-              <button style={{ ...BP, width:"100%", marginTop:16 }} onClick={()=>subscribe("monthly")} disabled={loading}>
-                {loading?"Redirection...":"Choisir"}
-              </button>
+          {/* Annuel uniquement — engagement 12 mois */}
+          <div style={{ background:"#1A1A1A", borderRadius:14, padding:24, border:"2px solid #FF4C1A", position:"relative" }}>
+            <div style={{ position:"absolute", top:-12, left:"50%", transform:"translateX(-50%)", background:"#FF4C1A", color:"#fff", fontSize:11, fontWeight:700, padding:"4px 16px", borderRadius:20, fontFamily:"'Helvetica Neue',sans-serif", whiteSpace:"nowrap" }}>ENGAGEMENT 12 MOIS</div>
+            <div style={{ display:"flex", alignItems:"flex-end", gap:8, marginBottom:4, marginTop:8 }}>
+              <div style={{ fontSize:48, fontWeight:700, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", lineHeight:1 }}>4,99€</div>
+              <div style={{ fontSize:16, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:6 }}>HT / mois</div>
             </div>
-
-            {/* Annuel */}
-            <div style={{ background:"#1A1A1A", borderRadius:14, padding:20, border:"2px solid #FF4C1A", position:"relative" }}>
-              <div style={{ position:"absolute", top:-10, right:16, background:"#FF4C1A", color:"#fff", fontSize:10, fontWeight:700, padding:"3px 10px", borderRadius:20, fontFamily:"'Helvetica Neue',sans-serif" }}>MEILLEURE OFFRE</div>
-              <div style={{ fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#888", marginBottom:8 }}>Annuel</div>
-              <div style={{ fontSize:28, fontWeight:700, color:"#E8E0D4", fontFamily:"'Helvetica Neue',sans-serif" }}>59,88€<span style={{ fontSize:14, fontWeight:400, color:"#888" }}>/an</span></div>
-              <div style={{ fontSize:12, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4, marginBottom:16 }}>= 4,99€ HT/mois · 2 mois offerts</div>
-              {["Prospects illimités","Scan carte IA","Synthèse IA","Export Excel","Rapports"].map(f=>(
-                <div key={f} style={{ fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#aaa", marginBottom:6 }}>✓ {f}</div>
+            <div style={{ fontSize:13, color:"#666", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:4 }}>Facturé 59,88€ HT / an</div>
+            <div style={{ fontSize:11, color:"#555", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:20, fontStyle:"italic" }}>Engagement 12 mois minimum</div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:20 }}>
+              {["✓ Prospects illimités","✓ Scan carte IA","✓ Synthèse IA","✓ Export Excel","✓ Rapports","✓ Multi-utilisateurs"].map(f=>(
+                <div key={f} style={{ fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#aaa" }}>{f}</div>
               ))}
-              <button style={{ ...BP, width:"100%", marginTop:16, background:"#FF4C1A" }} onClick={()=>subscribe("annual")} disabled={loading}>
-                {loading?"Redirection...":"Choisir"}
-              </button>
+            </div>
+            <button style={{ ...BP, width:"100%", padding:"14px", background:"#FF4C1A", fontSize:15 }} onClick={()=>subscribe("annual")} disabled={loading}>
+              {loading ? "Redirection vers le paiement..." : "S'abonner — 59,88€ HT / an →"}
+            </button>
+            <div style={{ fontSize:11, color:"#444", fontFamily:"'Helvetica Neue',sans-serif", textAlign:"center", marginTop:10 }}>
+              🎁 Essai gratuit 7 jours inclus · Sans carte bancaire requise
             </div>
           </div>
         </div>
