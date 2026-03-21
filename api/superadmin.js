@@ -46,37 +46,43 @@ export default async function handler(req, res) {
 
     // ── GENERATE KEYS MANUALLY ──────────────────────────────
     if (action === "generateKeys") {
-      const { quantity = 1, email, companyName, notes } = req.body;
+      const { quantity = 1, email, companyName, notes, trialDays = 0 } = req.body;
       const qty      = Math.max(1, parseInt(quantity));
       const batchId  = crypto.randomUUID();
       const expiresAt = new Date();
-      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      if (trialDays > 0) {
+        expiresAt.setDate(expiresAt.getDate() + trialDays);
+      } else {
+        expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      }
+      const keyPlan = trialDays > 0 ? "trial" : "annual";
+      const trialSuffix = trialDays > 0 ? ` [ESSAI ${trialDays} jours]` : "";
 
       const keysToInsert = [];
 
       if (qty === 1) {
         keysToInsert.push({
           key: genKey(), email: email || null,
-          key_type: "individual", plan: "annual",
-          batch_id: batchId, notes: notes || "Généré manuellement",
+          key_type: "individual", plan: keyPlan,
+          batch_id: batchId, notes: (notes || "Généré manuellement") + trialSuffix,
           expires_at: expiresAt.toISOString(),
         });
       } else {
         // Manager key
         keysToInsert.push({
           key: genKey(), email: email || null,
-          key_type: "manager", plan: "annual",
+          key_type: "manager", plan: keyPlan,
           batch_id: batchId,
-          notes: notes || `Pack ${qty} licences — Licence Manager`,
+          notes: (notes || `Pack ${qty} licences — Licence Manager`) + trialSuffix,
           expires_at: expiresAt.toISOString(),
         });
         // Commercial keys
         for (let i = 1; i < qty; i++) {
           keysToInsert.push({
             key: genKey(), email: null,
-            key_type: "commercial", plan: "annual",
+            key_type: "commercial", plan: keyPlan,
             batch_id: batchId,
-            notes: notes || `Pack ${qty} licences — Licence Commercial ${i}`,
+            notes: (notes || `Pack ${qty} licences — Licence Commercial ${i}`) + trialSuffix,
             expires_at: expiresAt.toISOString(),
           });
         }
