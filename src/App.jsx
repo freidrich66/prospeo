@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "./supabase.js";
+import { LANGUAGES, t, detectBrowserLang, getSavedLang, saveLang } from "./i18n.js";
 
 const STATUS_COLORS = {
   chaud:    { bg: "#FF4C1A", text: "#fff", label: "Chaud"    },
@@ -8,12 +9,12 @@ const STATUS_COLORS = {
   converti: { bg: "#00C48C", text: "#fff", label: "Converti" },
 };
 const SOURCE_ICONS = { carte: "📇", manuel: "✏️", vocal: "🎙️" };
-const PERIODS = [
-  { id: "today",     label: "Aujourd'hui"   },
-  { id: "yesterday", label: "Hier"          },
-  { id: "week",      label: "Cette semaine" },
-  { id: "month",     label: "Ce mois"       },
-  { id: "custom",    label: "Période libre" },
+const getPeriods = (lang="fr") => [
+  { id: "today",     label: t("today",lang)          },
+  { id: "yesterday", label: t("yesterday",lang)       },
+  { id: "week",      label: t("this_week_label",lang) },
+  { id: "month",     label: t("this_month",lang)      },
+  { id: "custom",    label: t("custom",lang)          },
 ];
 
 function useIsMobile() {
@@ -138,6 +139,9 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [lang, setLang]       = useState(getSavedLang() || detectBrowserLang());
+
+  const changeLang = (code) => { saveLang(code); setLang(code); };
 
   useEffect(() => {
     const style = document.createElement("style");
@@ -166,8 +170,8 @@ export default function App() {
   };
 
   if (loading) return <Loader />;
-  if (!session) return <AuthPage />;
-  return <ProspeoApp profile={profile} onSignOut={() => supabase.auth.signOut()} />;
+  if (!session) return <AuthPage lang={lang} changeLang={changeLang} />;
+  return <ProspeoApp profile={profile} onSignOut={() => supabase.auth.signOut()} lang={lang} changeLang={changeLang} />;
 }
 
 function AuthPage() {
@@ -213,13 +217,14 @@ function AuthPage() {
   );
 }
 
-function ProspeoApp({ profile, onSignOut }) {
+function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
   const [contacts, setContacts]         = useState([]);
   const [view, setView]                 = useState("dashboard");
   const [selected, setSelected]         = useState(null);
   const [notif, setNotif]               = useState(null);
   const [loadingData, setLoadingData]   = useState(true);
   const [subscription, setSubscription] = useState(null);
+  const [globalSearch, setGlobalSearch] = useState("");
   const isMobile = useIsMobile();
 
   const notify = (msg, type="success") => { setNotif({msg,type}); setTimeout(()=>setNotif(null),3000); };
@@ -273,14 +278,14 @@ function ProspeoApp({ profile, onSignOut }) {
   };
 
   const NAV = [
-    { id:"dashboard",     icon:"▦", label:"Accueil"      },
-    { id:"add",           icon:"＋", label:"Ajouter"      },
-    { id:"list",          icon:"≡", label:"Prospects"     },
-    { id:"report",        icon:"◉", label:"Rapports"      },
-    { id:"profile",       icon:"👤", label:"Mon profil"   },
-    { id:"crm",           icon:"🔗", label:"CRM"           },
-    ...(profile?.role !== "manager" ? [{ id:"subscription", icon:"⭐", label:"Abonnement" }] : []),
-    ...(isSuperManager(profile) ? [{ id:"superadmin", icon:"🔐", label:"Super Admin" }] : []),
+    { id:"dashboard",     icon:"▦", label:t("nav_home",lang)         },
+    { id:"add",           icon:"＋", label:t("nav_add",lang)          },
+    { id:"list",          icon:"≡", label:t("nav_prospects",lang)     },
+    { id:"report",        icon:"◉", label:t("nav_reports",lang)       },
+    { id:"profile",       icon:"👤", label:t("nav_profile",lang)      },
+    { id:"crm",           icon:"🔗", label:t("nav_crm",lang)          },
+    ...(profile?.role !== "manager" ? [{ id:"subscription", icon:"⭐", label:t("nav_subscription",lang) }] : []),
+    ...(isSuperManager(profile) ? [{ id:"superadmin", icon:"🔐", label:t("nav_superadmin",lang) }] : []),
   ];
 
   const go = (id) => setView(id);
@@ -320,7 +325,11 @@ function ProspeoApp({ profile, onSignOut }) {
               <div style={{ display:"flex", flexDirection:"column", gap:2, color:"#888", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif" }}><span style={{ fontSize:19, fontWeight:700, color:"#E8E0D4" }}>{stats.total}</span><span>prospects</span></div>
               <div style={{ display:"flex", flexDirection:"column", gap:2, color:"#888", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif" }}><span style={{ fontSize:19, fontWeight:700, color:"#FF4C1A" }}>{stats.chaud}</span><span>chauds</span></div>
             </div>
-            <button style={{ width:"100%", padding:"8px 0", background:"transparent", border:"1px solid #333", borderRadius:6, color:"#666", cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif" }} onClick={onSignOut}>Déconnexion</button>
+            <select value={lang} onChange={e=>changeLang(e.target.value)}
+              style={{ width:"100%", padding:"6px 8px", background:"#1E1E1E", border:"1px solid #333", borderRadius:6, color:"#888", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", marginBottom:6 }}>
+              {LANGUAGES.map(l=><option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}
+            </select>
+            <button style={{ width:"100%", padding:"8px 0", background:"transparent", border:"1px solid #333", borderRadius:6, color:"#666", cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif" }} onClick={onSignOut}>{t("signout",lang)}</button>
           </div>
         </aside>
       )}
@@ -341,16 +350,16 @@ function ProspeoApp({ profile, onSignOut }) {
 
       {/* Main */}
       <main style={{ flex:1, overflow:"auto", paddingTop:isMobile?54:0, paddingBottom:isMobile?68:0 }}>
-        {view==="dashboard" && <DashboardView contacts={contacts} stats={stats} loadingData={loadingData} profile={profile} isMobile={isMobile} go={go} onSelect={c=>{setSelected(c);setView("detail");}} />}
+        {view==="dashboard" && <DashboardView contacts={contacts} stats={stats} loadingData={loadingData} profile={profile} isMobile={isMobile} go={go} lang={lang} globalSearch={globalSearch} setGlobalSearch={setGlobalSearch} onSelect={c=>{setSelected(c);setView("detail");}} />}
         {view==="add"       && <AddView profile={profile} isMobile={isMobile} notify={notify} onAdded={()=>{loadContacts();setView("list");}} />}
-        {view==="list"      && <ListView contacts={contacts} profile={profile} loadingData={loadingData} isMobile={isMobile} onSelect={c=>{setSelected(c);setView("detail");}} onAdd={()=>go("add")} />}
-        {view==="detail" && selected && <DetailView contact={selected} profile={profile} isMobile={isMobile} onBack={()=>setView("list")} onStatusUpdate={handleStatusUpdate} onDelete={handleDelete} notify={notify} />}
-        {view==="report"    && <ReportView contacts={contacts} profile={profile} isMobile={isMobile} notify={notify} />}
-        {view==="profile"       && <ProfileView profile={profile} isMobile={isMobile} notify={notify} onUpdated={(p)=>{ setProfile(p); }} />}
-        {view==="subscription"  && <SubscriptionView profile={profile} subscription={subscription} isMobile={isMobile} notify={notify} onActivated={loadSubscription} />}
+        {view==="list"      && <ListView contacts={contacts} profile={profile} loadingData={loadingData} isMobile={isMobile} lang={lang} onSelect={c=>{setSelected(c);setView("detail");}} onAdd={()=>go("add")} />}
+        {view==="detail" && selected && <DetailView contact={selected} profile={profile} isMobile={isMobile} lang={lang} onBack={()=>setView("list")} onStatusUpdate={handleStatusUpdate} onDelete={handleDelete} notify={notify} />}
+        {view==="report"    && <ReportView contacts={contacts} profile={profile} isMobile={isMobile} lang={lang} globalSearch={globalSearch} setGlobalSearch={setGlobalSearch} notify={notify} onSelectContact={c=>{setSelected(c);setView("detail");}} />}
+        {view==="profile"       && <ProfileView profile={profile} isMobile={isMobile} notify={notify} lang={lang} changeLang={changeLang} onUpdated={(p)=>{ setProfile(p); }} />}
+        {view==="subscription"  && <SubscriptionView profile={profile} subscription={subscription} isMobile={isMobile} lang={lang} notify={notify} onActivated={loadSubscription} />}
         {view==="activate"      && <ActivateKeyView profile={profile} isMobile={isMobile} notify={notify} onActivated={()=>{ loadSubscription(); setView("dashboard"); }} />}
         {view==="superadmin" && isSuperManager(profile) && <SuperAdminView profile={profile} isMobile={isMobile} notify={notify} />}
-        {view==="crm"         && <CRMConfigView profile={profile} isMobile={isMobile} notify={notify} />}
+        {view==="crm"         && <CRMConfigView profile={profile} isMobile={isMobile} lang={lang} notify={notify} />}
       </main>
 
       {/* Mobile bottom nav */}
@@ -368,11 +377,11 @@ function ProspeoApp({ profile, onSignOut }) {
   );
 }
 
-function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, onSelect }) {
+function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, lang="fr", globalSearch="", setGlobalSearch, onSelect }) {
   return (
     <div style={P(isMobile)}>
       <div style={{ marginBottom:22 }}>
-        <h1 style={T(isMobile)}>Tableau de bord</h1>
+        <h1 style={T(isMobile)}>{t("dashboard_title",lang)}</h1>
         <p style={Sub}>{new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</p>
       </div>
 
@@ -407,15 +416,101 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, on
         return null;
       })()}
       <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)", gap:12, marginBottom:22 }}>
-        {[{label:"Total",value:stats.total,bg:"#E8E0D4",fg:"#1A1A1A"},{label:"Chauds",value:stats.chaud,bg:"#FF4C1A",fg:"#fff"},{label:"Convertis",value:stats.converti,bg:"#00C48C",fg:"#fff"},{label:"Semaine",value:stats.thisWeek,bg:"#1A1A1A",fg:"#E8E0D4"}].map(st=>(
+        {[{label:t("total",lang),value:stats.total,bg:"#E8E0D4",fg:"#1A1A1A"},{label:t("hot",lang),value:stats.chaud,bg:"#FF4C1A",fg:"#fff"},{label:t("converted",lang),value:stats.converti,bg:"#00C48C",fg:"#fff"},{label:t("this_week",lang),value:stats.thisWeek,bg:"#1A1A1A",fg:"#E8E0D4"}].map(st=>(
           <div key={st.label} style={{ background:st.bg, borderRadius:14, padding:isMobile?"15px":"20px" }}>
             <div style={{ fontSize:isMobile?30:36, fontWeight:700, color:st.fg, lineHeight:1 }}>{st.value}</div>
             <div style={{ fontSize:10, color:st.fg, opacity:0.7, fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5, marginTop:4 }}>{st.label}</div>
           </div>
         ))}
       </div>
+      {/* ── BARRE DE RECHERCHE GLOBALE ── */}
+      {(() => {
+        const q = globalSearch.trim().toLowerCase();
+        const statusMap = {
+          chaud: ["chaud","hot","caliente","quente","caldo","heiß","varm","het"],
+          tiede: ["tiède","tiede","warm","tibio","morno","tiepido","lunken","ljummen","lauw"],
+          froid: ["froid","cold","frío","frio","freddo","kalt","kald","kall","koud"],
+          converti: ["converti","converted","convertido","convertito","konvertiert","konvertert","konverterad","geconverteerd"],
+        };
+        const matchStatus = (status, q) => {
+          const aliases = statusMap[status] || [status];
+          return aliases.some(a => a.includes(q));
+        };
+        const results = q.length >= 2 ? contacts.filter(c => {
+          const name = `${c.first_name||""} ${c.last_name||""}`.toLowerCase();
+          const rep  = (c.profiles?.full_name||c.profiles?.email||"").toLowerCase();
+          return name.includes(q)
+            || (c.company||"").toLowerCase().includes(q)
+            || (c.email||"").toLowerCase().includes(q)
+            || (c.phone||"").toLowerCase().includes(q)
+            || matchStatus(c.status, q)
+            || rep.includes(q);
+        }) : [];
+        return (
+          <div style={{ ...C, marginBottom:16 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <div style={{ flex:1, position:"relative" }}>
+                <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:16, pointerEvents:"none" }}>🔍</span>
+                <input
+                  style={{ ...I, paddingLeft:38 }}
+                  placeholder={t("search",lang) + " — nom, entreprise, email, statut..."}
+                  value={globalSearch}
+                  onChange={e=>setGlobalSearch(e.target.value)}
+                />
+              </div>
+              {globalSearch && (
+                <button style={{ border:"none", background:"#F0EBE0", borderRadius:8, padding:"10px 12px", cursor:"pointer", fontSize:13, color:"#888" }}
+                  onClick={()=>setGlobalSearch("")}>✕</button>
+              )}
+            </div>
+
+            {q.length >= 2 && (
+              <div style={{ marginTop:10 }}>
+                {results.length === 0 ? (
+                  <div style={{ padding:"12px 0", color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", fontSize:13, textAlign:"center" }}>
+                    Aucun résultat pour « {globalSearch} »
+                  </div>
+                ) : results.length === 1 ? (
+                  // Un seul résultat → ouvre directement la fiche
+                  <div>
+                    <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:6 }}>1 résultat — cliquez pour ouvrir la fiche</div>
+                    {results.map(c => (
+                      <div key={c.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px", background:"#FFF8F4", borderRadius:10, cursor:"pointer", border:"1.5px solid #FFD4C4" }} onClick={()=>{ onSelect(c); setGlobalSearch(""); }}>
+                        <div style={AV}>{c.first_name?.[0]}{c.last_name?.[0]}</div>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:14, fontWeight:600, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>{c.first_name} {c.last_name}</div>
+                          <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{c.company||"—"} · {c.email||c.phone||""}</div>
+                          {profile?.role==="manager" && c.profiles?.full_name && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>👤 {c.profiles.full_name}</div>}
+                        </div>
+                        <div style={{ ...SB, background:STATUS_COLORS[c.status]?.bg, color:STATUS_COLORS[c.status]?.text, flexShrink:0 }}>{STATUS_COLORS[c.status]?.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  // Plusieurs résultats → liste cliquable
+                  <div>
+                    <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:6 }}>{results.length} résultats</div>
+                    {results.map(c => (
+                      <div key={c.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"9px 0", borderBottom:"1px solid #F0EBE0", cursor:"pointer" }} onClick={()=>{ onSelect(c); setGlobalSearch(""); }}>
+                        <div style={AV}>{c.first_name?.[0]}{c.last_name?.[0]}</div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:13, fontWeight:600, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.first_name} {c.last_name}</div>
+                          <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.company||"—"} · {c.email||c.phone||""}</div>
+                          {profile?.role==="manager" && c.profiles?.full_name && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>👤 {c.profiles.full_name}</div>}
+                        </div>
+                        <div style={{ ...SB, background:STATUS_COLORS[c.status]?.bg, color:STATUS_COLORS[c.status]?.text, flexShrink:0 }}>{STATUS_COLORS[c.status]?.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       <div style={C}>
-        <h3 style={CT}>Derniers prospects</h3>
+        <h3 style={CT}>{t("last_prospects",lang)}</h3>
         {loadingData ? <div style={LT}>Chargement...</div> :
           contacts.slice(0,5).map(c=>(
             <div key={c.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"11px 0", borderBottom:"1px solid #F0EBE0", cursor:"pointer" }} onClick={()=>onSelect(c)}>
@@ -436,7 +531,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, on
       </div>
       {profile?.role==="manager" && (
         <div style={{ ...C, marginTop:14 }}>
-          <h3 style={CT}>Par commercial</h3>
+          <h3 style={CT}>{t("by_sales_rep",lang)}</h3>
           {(() => {
             const byUser = contacts.reduce((acc, c) => {
               const name = displayName(c.profiles);
@@ -461,7 +556,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, on
       )}
 
       <div style={{ ...C, marginTop:14 }}>
-        <h3 style={CT}>Actions rapides</h3>
+        <h3 style={CT}>{t("quick_actions",lang)}</h3>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
           {[{icon:"✏️",label:"Saisie manuelle",to:"add"},{icon:"📇",label:"Scanner carte",to:"add"},{icon:"📊",label:"Export Excel",to:"report"},{icon:"◉",label:"Rapports",to:"report"}].map(q=>(
             <button key={q.label} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6, padding:isMobile?13:15, border:"2px solid #F0EBE0", borderRadius:12, background:"#F5F0E8", cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }} onClick={()=>go(q.to)}>
@@ -474,7 +569,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, on
   );
 }
 
-function AddView({ profile, isMobile, notify, onAdded }) {
+function AddView({ profile, isMobile, notify, lang="fr", onAdded }) {
   const [form, setForm] = useState({ first_name:"", last_name:"", company:"", role:"", email:"", phone:"", source:"manuel", notes:"", status:"froid" });
   const [analyzing, setAnalyzing] = useState(false);
   const [rec, setRec]             = useState(false);
@@ -654,17 +749,17 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
   };
 
   const FIELDS = [
-    { k:"first_name", l:"Prénom *",   ph:"Jean"                 },
-    { k:"last_name",  l:"Nom *",      ph:"Dupont"               },
-    { k:"company",    l:"Entreprise", ph:"Acme Corp"            },
-    { k:"role",       l:"Poste",      ph:"Directeur Commercial" },
-    { k:"email",      l:"Email",      ph:"jean@acme.fr"         },
-    { k:"phone",      l:"Téléphone",  ph:"+33 6 00 00 00 00"    },
+    { k:"first_name", l:t("first_name",lang)+" *", ph:"Jean" },
+    { k:"last_name",  l:t("last_name",lang)+" *", ph:"Dupont" },
+    { k:"company",    l:t("company",lang), ph:"Acme Corp" },
+    { k:"role",       l:t("role",lang), ph:"Director" },
+    { k:"email",      l:t("email",lang), ph:"jean@acme.fr" },
+    { k:"phone",      l:t("phone",lang), ph:"+33 6 00 00 00 00" },
   ];
 
   return (
     <div style={P(isMobile)}>
-      <h1 style={T(isMobile)}>Nouveau prospect</h1>
+      <h1 style={T(isMobile)}>{t("add_title",lang)}</h1>
       {showPWABanner && (
         <div style={{ background:"#1A1A1A", borderRadius:16, padding:20, marginBottom:20 }}>
           <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:12 }}>
@@ -690,7 +785,7 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
       )}
 
       <div style={{ display:"flex", gap:8, marginBottom:22, flexWrap:"wrap" }}>
-        {[{id:"manuel",icon:"✏️",label:"Manuel"},{id:"carte",icon:"📇",label:"Carte IA"},{id:"vocal",icon:"🎙️",label:"Vocal"}].map(src=>(
+        {[{id:"manuel",icon:"✏️",label:t("manual",lang)},{id:"carte",icon:"📇",label:t("card_ai",lang)},{id:"vocal",icon:"🎙️",label:t("vocal",lang)}].map(src=>(
           <button key={src.id} style={{ display:"flex", alignItems:"center", gap:6, padding:isMobile?"9px 13px":"10px 18px", border:`2px solid ${form.source===src.id?"#1A1A1A":"#E8E0D4"}`, borderRadius:30, background:form.source===src.id?"#1A1A1A":"transparent", color:form.source===src.id?"#E8E0D4":"#888", cursor:"pointer", fontSize:13, fontFamily:"'Helvetica Neue',sans-serif" }}
             onClick={()=>{
               if(src.id==="carte") { f("source","carte"); fileRef.current?.click(); }
@@ -807,7 +902,7 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
   );
 }
 
-function ListView({ contacts, profile, loadingData, isMobile, onSelect, onAdd }) {
+function ListView({ contacts, profile, loadingData, isMobile, lang="fr", onSelect, onAdd }) {
   const [search, setSearch] = useState("");
   const [fs, setFs]         = useState("all");
 
@@ -823,7 +918,7 @@ function ListView({ contacts, profile, loadingData, isMobile, onSelect, onAdd })
         <h1 style={T(isMobile)}>{profile?.role==="manager"?"Tous les prospects":"Mes prospects"}</h1>
         {!isMobile && <button style={BP} onClick={onAdd}>＋ Nouveau</button>}
       </div>
-      <input style={{ ...I, marginBottom:10, width:"100%" }} placeholder="🔍  Rechercher..." value={search} onChange={e=>setSearch(e.target.value)} />
+      <input style={{ ...I, marginBottom:10, width:"100%" }} placeholder={"🔍  " + t("search",lang)} value={search} onChange={e=>setSearch(e.target.value)} />
       <div style={{ display:"flex", gap:6, marginBottom:14, overflowX:"auto", paddingBottom:4 }}>
         {["all","chaud","tiède","froid","converti"].map(st=>(
           <button key={st} style={{ padding:"6px 11px", border:`2px solid ${fs===st?"#1A1A1A":"#E8E0D4"}`, borderRadius:20, background:fs===st?"#1A1A1A":"transparent", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:fs===st?"#E8E0D4":"#888", flexShrink:0 }}
@@ -853,7 +948,7 @@ function ListView({ contacts, profile, loadingData, isMobile, onSelect, onAdd })
   );
 }
 
-function DetailView({ contact:initialContact, profile, isMobile, onBack, onStatusUpdate, onDelete, notify }) {
+function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBack, onStatusUpdate, onDelete, notify }) {
   const [c, setC]              = useState(initialContact);
   const [synthesis, setSyn]    = useState(null);
   const [synLoad, setSynLoad]  = useState(false);
@@ -908,16 +1003,16 @@ function DetailView({ contact:initialContact, profile, isMobile, onBack, onStatu
   return (
     <div style={P(isMobile)}>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:18 }}>
-        <button style={{ border:"none", background:"transparent", cursor:"pointer", color:"#888", fontFamily:"'Helvetica Neue',sans-serif", fontSize:14, padding:0 }} onClick={onBack}>← Retour</button>
+        <button style={{ border:"none", background:"transparent", cursor:"pointer", color:"#888", fontFamily:"'Helvetica Neue',sans-serif", fontSize:14, padding:0 }} onClick={onBack}>{t("back",lang)}</button>
         {!editing && (
           <button style={{ padding:"8px 16px", background:"#1A1A1A", color:"#E8E0D4", border:"none", borderRadius:8, cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
-            onClick={startEdit}>✏️ Modifier</button>
+            onClick={startEdit}>{t("edit",lang)}</button>
         )}
       </div>
 
       {editing && (
         <div style={C}>
-          <h3 style={CT}>Modifier le prospect</h3>
+          <h3 style={CT}>{t("edit_prospect",lang)}</h3>
           <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:12, marginBottom:12 }}>
             {[
               { k:"first_name", l:"Prénom *",   ph:"Jean" },
@@ -940,7 +1035,7 @@ function DetailView({ contact:initialContact, profile, isMobile, onBack, onStatu
           <div style={{ display:"flex", gap:10 }}>
             <button style={{ ...BS, flex:1 }} onClick={()=>setEditing(false)}>Annuler</button>
             <button style={{ ...BP, flex:1 }} onClick={saveEdit} disabled={saving}>
-              {saving ? "Sauvegarde..." : "✅ Enregistrer"}
+              {saving ? "Sauvegarde..." : t("save",lang)}
             </button>
           </div>
         </div>
@@ -964,7 +1059,7 @@ function DetailView({ contact:initialContact, profile, isMobile, onBack, onStatu
       </div>}
 
       <div style={{ ...C, marginBottom:14 }}>
-        <label style={L}>Modifier le statut</label>
+        <label style={L}>{t("edit_status",lang)}</label>
         <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:8 }}>
           {Object.entries(STATUS_COLORS).map(([key,val])=>(
             <button key={key} style={{ padding:"7px 13px", borderRadius:20, cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, background:c.status===key?val.bg:"transparent", color:c.status===key?val.text:"#888", border:`2px solid ${val.bg}` }}
@@ -987,8 +1082,8 @@ function DetailView({ contact:initialContact, profile, isMobile, onBack, onStatu
 
       <div style={{ background:"#FFF8F4", borderRadius:12, padding:18, border:"2px solid #FFD4C4", marginBottom:14 }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-          <h3 style={CT}>Synthèse IA</h3>
-          <button style={{ padding:"7px 14px", background:"#1A1A1A", color:"#E8E0D4", border:"none", borderRadius:8, cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }} onClick={genSyn} disabled={synLoad}>{synLoad?"...":"✨ Générer"}</button>
+          <h3 style={CT}>{t("ai_synthesis",lang)}</h3>
+          <button style={{ padding:"7px 14px", background:"#1A1A1A", color:"#E8E0D4", border:"none", borderRadius:8, cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }} onClick={genSyn} disabled={synLoad}>{synLoad?"...":t("generate",lang)}</button>
         </div>
         {(synthesis||past[0]) && <p style={{ fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#444", lineHeight:1.7, margin:0, fontStyle:"italic" }}>{synthesis||past[0]?.content}</p>}
       </div>
@@ -1000,7 +1095,7 @@ function DetailView({ contact:initialContact, profile, isMobile, onBack, onStatu
   );
 }
 
-function ReportView({ contacts, profile, isMobile, notify }) {
+function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", setGlobalSearch, notify, onSelectContact }) {
   const [period, setPeriod]   = useState("month");
   const [cs, setCs]           = useState("");
   const [ce, setCe]           = useState("");
@@ -1008,11 +1103,27 @@ function ReportView({ contacts, profile, isMobile, notify }) {
   const [sending, setSending] = useState(false);
 
   const [filterUser, setFilterUser] = useState("all");
+  const [reportSearch, setReportSearch] = useState(globalSearch||"");
   const { start, end } = getPeriodRange(period, cs, ce);
+  const statusAliases = {
+    chaud:["chaud","hot","caliente","quente","caldo"],
+    tiede:["tiède","tiede","warm","tibio","morno","tiepido"],
+    froid:["froid","cold","frío","frio","freddo","kalt"],
+    converti:["converti","converted","convertido","convertito"],
+  };
   const filtered = contacts.filter(c=>{
     const matchPeriod = !start || (new Date(c.created_at)>=start && new Date(c.created_at)<=end);
-    const matchUser = filterUser==="all" || displayName(c.profiles)===filterUser;
-    return matchPeriod && matchUser;
+    const matchUser   = filterUser==="all" || displayName(c.profiles)===filterUser;
+    const q = reportSearch.trim().toLowerCase();
+    const matchSearch = !q || q.length < 2 || (
+      `${c.first_name||""} ${c.last_name||""}`.toLowerCase().includes(q)
+      || (c.company||"").toLowerCase().includes(q)
+      || (c.email||"").toLowerCase().includes(q)
+      || (c.phone||"").toLowerCase().includes(q)
+      || (statusAliases[c.status]||[c.status]).some(a=>a.includes(q))
+      || displayName(c.profiles).toLowerCase().includes(q)
+    );
+    return matchPeriod && matchUser && matchSearch;
   });
   const allUsers = profile?.role==="manager" ? [...new Set(contacts.map(c=>c.profiles?.full_name||c.profiles?.email||"Inconnu"))] : [];
 
@@ -1037,7 +1148,7 @@ function ReportView({ contacts, profile, isMobile, notify }) {
       <h1 style={T(isMobile)}>Rapport & Export</h1>
 
       <div style={{ display:"flex", gap:6, marginBottom:14, overflowX:"auto", paddingBottom:4 }}>
-        {PERIODS.map(p=>(
+        {getPeriods(lang).map(p=>(
           <button key={p.id} style={{ padding:"6px 11px", border:`2px solid ${period===p.id?"#1A1A1A":"#E8E0D4"}`, borderRadius:20, background:period===p.id?"#1A1A1A":"transparent", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:period===p.id?"#E8E0D4":"#888", flexShrink:0 }}
             onClick={()=>setPeriod(p.id)}>{p.label}</button>
         ))}
@@ -1050,12 +1161,36 @@ function ReportView({ contacts, profile, isMobile, notify }) {
         </div>
       )}
 
+      {/* ── RECHERCHE DANS LE RAPPORT ── */}
+      <div style={{ marginBottom:14 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <div style={{ flex:1, position:"relative" }}>
+            <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:14, pointerEvents:"none" }}>🔍</span>
+            <input
+              style={{ ...I, paddingLeft:36 }}
+              placeholder={t("search",lang) + " — nom, entreprise, email, statut..."}
+              value={reportSearch}
+              onChange={e=>setReportSearch(e.target.value)}
+            />
+          </div>
+          {reportSearch && (
+            <button style={{ border:"none", background:"#F0EBE0", borderRadius:8, padding:"10px 12px", cursor:"pointer", fontSize:13, color:"#888" }}
+              onClick={()=>setReportSearch("")}>✕</button>
+          )}
+        </div>
+        {reportSearch.trim().length >= 2 && (
+          <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4 }}>
+            {filtered.length} résultat{filtered.length !== 1 ? "s" : ""} pour « {reportSearch} »
+          </div>
+        )}
+      </div>
+
       {profile?.role==="manager" && allUsers.length > 0 && (
         <div style={{ marginBottom:14 }}>
-          <label style={L}>Filtrer par commercial</label>
+          <label style={L}>{t("filter_by_rep",lang)}</label>
           <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:6 }}>
             <button style={{ padding:"6px 12px", border:`2px solid ${filterUser==="all"?"#1A1A1A":"#E8E0D4"}`, borderRadius:20, background:filterUser==="all"?"#1A1A1A":"transparent", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:filterUser==="all"?"#E8E0D4":"#888" }}
-              onClick={()=>setFilterUser("all")}>Tous</button>
+              onClick={()=>setFilterUser("all")}>{t("all",lang)}</button>
             {allUsers.map(u=>(
               <button key={u} style={{ padding:"6px 12px", border:`2px solid ${filterUser===u?"#FF4C1A":"#E8E0D4"}`, borderRadius:20, background:filterUser===u?"#FF4C1A":"transparent", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:filterUser===u?"#fff":"#888" }}
                 onClick={()=>setFilterUser(u)}>👤 {u}</button>
@@ -1065,7 +1200,7 @@ function ReportView({ contacts, profile, isMobile, notify }) {
       )}
 
       <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)", gap:10, marginBottom:14 }}>
-        {[{label:"Total",value:stats.total,bg:"#1A1A1A",fg:"#E8E0D4"},{label:"Chauds",value:stats.chaud,bg:"#FF4C1A",fg:"#fff"},{label:"Convertis",value:stats.converti,bg:"#00C48C",fg:"#fff"},{label:"Carte IA",value:stats.carte,bg:"#E8E0D4",fg:"#1A1A1A"}].map(st=>(
+        {[{label:t("total",lang),value:stats.total,bg:"#1A1A1A",fg:"#E8E0D4"},{label:t("hot",lang),value:stats.chaud,bg:"#FF4C1A",fg:"#fff"},{label:t("converted",lang),value:stats.converti,bg:"#00C48C",fg:"#fff"},{label:"Carte IA",value:stats.carte,bg:"#E8E0D4",fg:"#1A1A1A"}].map(st=>(
           <div key={st.label} style={{ background:st.bg, borderRadius:12, padding:"14px", textAlign:"center" }}>
             <div style={{ fontSize:26, fontWeight:700, color:st.fg }}>{st.value}</div>
             <div style={{ fontSize:10, color:st.fg, opacity:0.7, fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5, marginTop:3 }}>{st.label}</div>
@@ -1074,8 +1209,8 @@ function ReportView({ contacts, profile, isMobile, notify }) {
       </div>
 
       <div style={{ ...C, marginBottom:14 }}>
-        <h3 style={CT}>Par source</h3>
-        {[{label:"Carte IA",value:stats.carte,icon:"📇"},{label:"Manuel",value:stats.manuel,icon:"✏️"},{label:"Vocal",value:stats.vocal,icon:"🎙️"}].map(st=>(
+        <h3 style={CT}>{t("by_source",lang)}</h3>
+        {[{label:t("card_ai",lang),value:stats.carte,icon:"📇"},{label:t("manual",lang),value:stats.manuel,icon:"✏️"},{label:t("vocal",lang),value:stats.vocal,icon:"🎙️"}].map(st=>(
           <div key={st.label} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
             <span>{st.icon}</span>
             <span style={{ fontFamily:"'Helvetica Neue',sans-serif", fontSize:13, color:"#444", flex:1 }}>{st.label}</span>
@@ -1089,7 +1224,7 @@ function ReportView({ contacts, profile, isMobile, notify }) {
         <h3 style={CT}>Contacts ({filtered.length})</h3>
         {filtered.length===0 ? <div style={{ textAlign:"center", color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", padding:16 }}>Aucun prospect sur cette période</div> :
           filtered.map(c=>(
-            <div key={c.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 0", borderBottom:"1px solid #F0EBE0" }}>
+            <div key={c.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 0", borderBottom:"1px solid #F0EBE0", cursor:"pointer" }} onClick={()=>onSelectContact && onSelectContact(c)}>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:"#1A1A1A" }}>{c.first_name} {c.last_name}</div>
                 <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.company||"—"} · {new Date(c.created_at).toLocaleDateString("fr-FR")}</div>
@@ -1102,7 +1237,7 @@ function ReportView({ contacts, profile, isMobile, notify }) {
       </div>
 
       <div style={{ display:"flex", gap:10, flexDirection:isMobile?"column":"row" }}>
-        <button style={{ ...BS, flex:1 }} onClick={exportExcel}>📊 Exporter Excel</button>
+        <button style={{ ...BS, flex:1 }} onClick={exportExcel}>{t("export_excel",lang)}</button>
         <button style={{ ...BP, flex:1 }} onClick={()=>setPreview(true)}>📧 Envoyer email</button>
       </div>
 
@@ -1111,7 +1246,7 @@ function ReportView({ contacts, profile, isMobile, notify }) {
           <div style={{ background:"#fff", borderRadius:isMobile?"20px 20px 0 0":16, padding:isMobile?"24px 20px 40px":32, width:isMobile?"100%":500 }}>
             <h3 style={{ fontSize:17, fontWeight:400, color:"#1A1A1A", margin:"0 0 14px", fontFamily:"Georgia,serif" }}>Envoyer le rapport</h3>
             <input style={{ ...I, marginBottom:10 }} placeholder="Destinataire" defaultValue="manager@entreprise.fr" />
-            <input style={{ ...I, marginBottom:10 }} placeholder="Objet" defaultValue={`Rapport — ${PERIODS.find(p=>p.id===period)?.label}`} />
+            <input style={{ ...I, marginBottom:10 }} placeholder="Objet" defaultValue={`Rapport — ${getPeriods(lang).find(p=>p.id===period)?.label}`} />
             <textarea style={{ ...I, minHeight:70, marginBottom:14 }} defaultValue={`Total : ${stats.total} | Chauds : ${stats.chaud} | Convertis : ${stats.converti}`} />
             <div style={{ display:"flex", gap:10 }}>
               <button style={{ ...BS, flex:1 }} onClick={()=>setPreview(false)}>Annuler</button>
@@ -1124,7 +1259,7 @@ function ReportView({ contacts, profile, isMobile, notify }) {
   );
 }
 
-function ProfileView({ profile, isMobile, notify, onUpdated }) {
+function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, onUpdated }) {
   const [form, setForm] = useState({
     first_name: "",
     last_name:  "",
@@ -1168,7 +1303,7 @@ function ProfileView({ profile, isMobile, notify, onUpdated }) {
       .select()
       .single();
     if (error) { notify("Erreur sauvegarde","error"); }
-    else { notify("✅ Profil mis à jour !"); onUpdated({ ...profile, ...data }); }
+    else { notify(t("profile_updated",lang)); onUpdated({ ...profile, ...data }); }
     setSaving(false);
   };
 
@@ -1177,7 +1312,7 @@ function ProfileView({ profile, isMobile, notify, onUpdated }) {
   return (
     <div style={P(isMobile)}>
       <div style={{ marginBottom:22 }}>
-        <h1 style={T(isMobile)}>Mon profil</h1>
+        <h1 style={T(isMobile)}>{t("profile_title",lang)}</h1>
         <p style={Sub}>Vos informations personnelles</p>
       </div>
 
@@ -1201,7 +1336,7 @@ function ProfileView({ profile, isMobile, notify, onUpdated }) {
 
       {/* Formulaire */}
       <div style={C}>
-        <h3 style={CT}>Informations personnelles</h3>
+        <h3 style={CT}>{t("personal_info",lang)}</h3>
         <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:14 }}>
           <div>
             <label style={L}>Prénom</label>
@@ -1227,8 +1362,21 @@ function ProfileView({ profile, isMobile, notify, onUpdated }) {
           <div style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>L'email ne peut pas être modifié</div>
         </div>
 
+        <div style={{ marginTop:16 }}>
+          <label style={L}>{t("language_label",lang)}</label>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:8 }}>
+            {LANGUAGES.map(l => (
+              <button key={l.code}
+                style={{ padding:"7px 12px", border:`2px solid ${lang===l.code?"#FF4C1A":"#E8E0D4"}`, borderRadius:20, background:lang===l.code?"#FF4C1A":"transparent", color:lang===l.code?"#fff":"#888", cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:lang===l.code?700:400 }}
+                onClick={()=>changeLang && changeLang(l.code)}>
+                {l.flag} {l.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <button style={{ ...BP, width:"100%", marginTop:16, padding:"14px" }} onClick={save} disabled={saving}>
-          {saving ? "Sauvegarde..." : "Enregistrer mon profil"}
+          {saving ? t("saving",lang) : t("save_profile",lang)}
         </button>
       </div>
     </div>
@@ -1563,6 +1711,7 @@ function SuperAdminView({ profile, isMobile, notify }) {
   const [genEmail, setGenEmail]   = useState("");
   const [genCompany, setGenCompany] = useState("");
   const [genNotes, setGenNotes]   = useState("");
+  const [genTrial, setGenTrial]   = useState("annual");
   const [genLoading, setGenLoading] = useState(false);
   const [newKeys, setNewKeys]     = useState([]);
 
@@ -1585,6 +1734,7 @@ function SuperAdminView({ profile, isMobile, notify }) {
     const res = await call("generateKeys", {
       quantity: genQty, email: genEmail,
       companyName: genCompany, notes: genNotes,
+      trialDays: genTrial === 'trial7' ? 7 : genTrial === 'trial14' ? 14 : 0,
     });
     if (res.success) {
       setNewKeys(res.keys);
@@ -1677,32 +1827,60 @@ function SuperAdminView({ profile, isMobile, notify }) {
               <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:12, marginBottom:14 }}>
                 <div>
                   <label style={L}>Nombre de licences</label>
-                  <input style={I} type="number" min="1" max="100" value={genQty}
-                    onChange={e=>setGenQty(parseInt(e.target.value)||1)} />
-                  {genQty > 1 && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4 }}>
-                    → 1 clé Manager + {genQty-1} clé(s) Commercial · chaque licence = 59,88€/an
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                    <button style={{ width:36, height:36, border:"2px solid #E8E0D4", borderRadius:8, background:"#fff", cursor:"pointer", fontSize:18, fontWeight:700, color:"#1A1A1A" }}
+                      onClick={()=>setGenQty(q=>Math.max(1,q-1))}>−</button>
+                    <input style={{ ...I, width:70, textAlign:"center", padding:"8px" }}
+                      type="number" min="1" max="100"
+                      value={genQty}
+                      onChange={e=>{ const v=parseInt(e.target.value); if(!isNaN(v)&&v>=1) setGenQty(v); else if(e.target.value==="") setGenQty(""); }}
+                      onBlur={e=>{ if(!e.target.value||parseInt(e.target.value)<1) setGenQty(1); }} />
+                    <button style={{ width:36, height:36, border:"2px solid #E8E0D4", borderRadius:8, background:"#fff", cursor:"pointer", fontSize:18, fontWeight:700, color:"#1A1A1A" }}
+                      onClick={()=>setGenQty(q=>Math.min(100,parseInt(q)||1)+1)}>+</button>
+                  </div>
+                  {genQty > 1 && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>
+                    → 1 clé Manager + {parseInt(genQty)-1} clé(s) Commercial
                   </div>}
                 </div>
                 <div>
-                  <label style={L}>Email client (optionnel)</label>
-                  <input style={I} placeholder="client@entreprise.fr" value={genEmail} onChange={e=>setGenEmail(e.target.value)} />
+                  <label style={L}>{parseInt(genQty) > 1 ? "Email du Manager" : "Email client (optionnel)"}</label>
+                  <input style={I} placeholder="manager@entreprise.fr" value={genEmail} onChange={e=>setGenEmail(e.target.value)} />
+                  {parseInt(genQty) > 1 && <div style={{ fontSize:10, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4 }}>
+                    Cet email recevra la clé Manager pour administrer les commerciaux
+                  </div>}
                 </div>
-                {genQty > 1 && (
+                {parseInt(genQty) > 1 && (
                   <div>
                     <label style={L}>Nom de l'entreprise</label>
                     <input style={I} placeholder="Acme Corp" value={genCompany} onChange={e=>setGenCompany(e.target.value)} />
                   </div>
                 )}
                 <div>
+                  <label style={L}>Type de clé</label>
+                  <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                    {[
+                      { val:"annual", label:"💳 Payante (12 mois)", color:"#1A1A1A", textColor:"#E8E0D4" },
+                      { val:"trial7", label:"🎁 Essai 7 jours",     color:"#1A6AFF", textColor:"#fff"    },
+                      { val:"trial14",label:"🎁 Essai 14 jours",    color:"#00C48C", textColor:"#fff"    },
+                    ].map(opt => (
+                      <button key={opt.val}
+                        style={{ flex:1, minWidth:100, padding:"10px 8px", border:`2px solid ${genTrial===opt.val?opt.color:"#E8E0D4"}`, borderRadius:8, background:genTrial===opt.val?opt.color:"transparent", color:genTrial===opt.val?opt.textColor:"#888", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
+                        onClick={()=>setGenTrial(opt.val)}>{opt.label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
                   <label style={L}>Notes internes</label>
                   <input style={I} placeholder="Ex: Offre salon..." value={genNotes} onChange={e=>setGenNotes(e.target.value)} />
                 </div>
               </div>
 
-              <div style={{ padding:14, background:"#F5F0E8", borderRadius:10, marginBottom:14 }}>
+              <div style={{ padding:14, background: genTrial?"#EBF0FF":"#F5F0E8", borderRadius:10, marginBottom:14 }}>
                 <div style={{ fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>
-                  💶 Total : <strong>{(genQty * 59.88).toFixed(2)}€</strong> TTC
-                  ({genQty} × 59,88€/licence · toutes les licences sont payantes)
+                  {genTrial !== "annual"
+                    ? <span>🎁 <strong>Clé(s) d'essai gratuit {genTrial === "trial7" ? "7" : "14"} jours</strong> — aucune facturation</span>
+                    : <span>💶 Total : <strong>{(parseInt(genQty||1) * 59.88).toFixed(2)}€</strong> HT · {parseInt(genQty||1)} × 59,88€/licence/an</span>
+                  }
                 </div>
               </div>
 
