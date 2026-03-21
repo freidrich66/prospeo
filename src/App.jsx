@@ -326,10 +326,10 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
               <div style={{ display:"flex", flexDirection:"column", gap:2, color:"#888", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif" }}><span style={{ fontSize:19, fontWeight:700, color:"#FF4C1A" }}>{stats.chaud}</span><span>chauds</span></div>
             </div>
             <select value={lang} onChange={e=>changeLang(e.target.value)}
-              style={{ width:"100%", padding:"6px 8px", background:"#1E1E1E", border:"1px solid #333", borderRadius:6, color:"#888", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", marginBottom:6 }}>
+              style={{ width:"100%", padding:"6px 8px", background:"#1E1E1E", border:"1px solid #333", borderRadius:6, color:"#E8E0D4", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", marginBottom:6 }}>
               {LANGUAGES.map(l=><option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}
             </select>
-            <button style={{ width:"100%", padding:"8px 0", background:"transparent", border:"1px solid #333", borderRadius:6, color:"#666", cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif" }} onClick={onSignOut}>{t("signout",lang)}</button>
+            <button style={{ width:"100%", padding:"8px 0", background:"transparent", border:"1px solid #333", borderRadius:6, color:"#E8E0D4", cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif" }} onClick={onSignOut}>{t("signout",lang)}</button>
           </div>
         </aside>
       )}
@@ -419,7 +419,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
         {[{label:t("total",lang),value:stats.total,bg:"#E8E0D4",fg:"#1A1A1A"},{label:t("hot",lang),value:stats.chaud,bg:"#FF4C1A",fg:"#fff"},{label:t("converted",lang),value:stats.converti,bg:"#00C48C",fg:"#fff"},{label:t("this_week",lang),value:stats.thisWeek,bg:"#1A1A1A",fg:"#E8E0D4"}].map(st=>(
           <div key={st.label} style={{ background:st.bg, borderRadius:14, padding:isMobile?"15px":"20px" }}>
             <div style={{ fontSize:isMobile?30:36, fontWeight:700, color:st.fg, lineHeight:1 }}>{st.value}</div>
-            <div style={{ fontSize:10, color:st.fg, opacity:0.7, fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5, marginTop:4 }}>{st.label}</div>
+            <div style={{ fontSize:10, color:"#FFFFFF", opacity:0.85, fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5, marginTop:4 }}>{st.label}</div>
           </div>
         ))}
       </div>
@@ -769,7 +769,7 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
             </div>
             <button style={{ border:"none", background:"transparent", color:"#888", cursor:"pointer", fontSize:18, padding:"0 0 0 8px" }} onClick={()=>setShowPWABanner(false)}>✕</button>
           </div>
-          <p style={{ fontSize:13, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 16px", lineHeight:1.6 }}>
+          <p style={{ fontSize:13, color:"#CCCCCC", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 16px", lineHeight:1.6 }}>
             La dictée vocale n'est pas disponible depuis l'app raccourci iPhone. Elle fonctionne uniquement dans <strong style={{ color:"#E8E0D4" }}>Google Chrome</strong>.
           </p>
           <button
@@ -778,7 +778,7 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
             <span>🌐</span>
             <span>Ouvrir dans Chrome</span>
           </button>
-          <p style={{ fontSize:11, color:"#555", fontFamily:"'Helvetica Neue',sans-serif", margin:"10px 0 0", textAlign:"center", lineHeight:1.5 }}>
+          <p style={{ fontSize:11, color:"#AAAAAA", fontFamily:"'Helvetica Neue',sans-serif", margin:"10px 0 0", textAlign:"center", lineHeight:1.5 }}>
             Si Chrome n'est pas installé, téléchargez-le depuis l'App Store
           </p>
         </div>
@@ -804,7 +804,7 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
             <div style={{ display:"flex", alignItems:"center", gap:8 }}>
               <div style={{ width:10, height:10, borderRadius:"50%", background: vocalRecRef.current ? "#FF4C1A" : "#555", animation: vocalRecRef.current ? "pulse 1s infinite" : "none" }} />
-              <span style={{ fontSize:13, fontWeight:600, color:"#E8E0D4", fontFamily:"'Helvetica Neue',sans-serif" }}>
+              <span style={{ fontSize:13, fontWeight:600, color:"#FFFFFF", fontFamily:"'Helvetica Neue',sans-serif" }}>
                 {isIOSSafari() ? "Dictée vocale" : vocalRecRef.current ? "Écoute en cours..." : "Prêt à écouter"}
               </span>
             </div>
@@ -828,7 +828,7 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
             </div>
           ) : (
             <div style={{ marginBottom:14 }}>
-              <p style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 8px", fontStyle:"italic" }}>
+              <p style={{ fontSize:11, color:"#CCCCCC", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 8px", fontStyle:"italic" }}>
                 Exemple : "Jean Dupont, directeur commercial chez Acme, jean@acme.fr, 06 12 34 56 78"
               </p>
               {!vocalRecRef.current ? (
@@ -1203,7 +1203,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
         {[{label:t("total",lang),value:stats.total,bg:"#1A1A1A",fg:"#E8E0D4"},{label:t("hot",lang),value:stats.chaud,bg:"#FF4C1A",fg:"#fff"},{label:t("converted",lang),value:stats.converti,bg:"#00C48C",fg:"#fff"},{label:"Carte IA",value:stats.carte,bg:"#E8E0D4",fg:"#1A1A1A"}].map(st=>(
           <div key={st.label} style={{ background:st.bg, borderRadius:12, padding:"14px", textAlign:"center" }}>
             <div style={{ fontSize:26, fontWeight:700, color:st.fg }}>{st.value}</div>
-            <div style={{ fontSize:10, color:st.fg, opacity:0.7, fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5, marginTop:3 }}>{st.label}</div>
+            <div style={{ fontSize:10, color:"#FFFFFF", opacity:0.85, fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5, marginTop:3 }}>{st.label}</div>
           </div>
         ))}
       </div>
@@ -1463,8 +1463,8 @@ function SubscriptionView({ profile, subscription, isMobile, notify, onActivated
               <div style={{ fontSize:48, fontWeight:700, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", lineHeight:1 }}>4,99€</div>
               <div style={{ fontSize:16, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:6 }}>HT / mois</div>
             </div>
-            <div style={{ fontSize:13, color:"#666", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:4 }}>Facturé 59,88€ HT / an</div>
-            <div style={{ fontSize:11, color:"#555", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:20, fontStyle:"italic" }}>Engagement 12 mois minimum</div>
+            <div style={{ fontSize:13, color:"#AAAAAA", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:4 }}>Facturé 59,88€ HT / an</div>
+            <div style={{ fontSize:11, color:"#AAAAAA", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:20, fontStyle:"italic" }}>Engagement 12 mois minimum</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:20 }}>
               {["✓ Prospects illimités","✓ Scan carte IA","✓ Synthèse IA","✓ Export Excel","✓ Rapports","✓ Multi-utilisateurs"].map(f=>(
                 <div key={f} style={{ fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#aaa" }}>{f}</div>
@@ -1473,7 +1473,7 @@ function SubscriptionView({ profile, subscription, isMobile, notify, onActivated
             <button style={{ ...BP, width:"100%", padding:"14px", background:"#FF4C1A", fontSize:15 }} onClick={()=>subscribe("annual")} disabled={loading}>
               {loading ? "Redirection vers le paiement..." : "S'abonner — 59,88€ HT / an →"}
             </button>
-            <div style={{ fontSize:11, color:"#444", fontFamily:"'Helvetica Neue',sans-serif", textAlign:"center", marginTop:10 }}>
+            <div style={{ fontSize:11, color:"#AAAAAA", fontFamily:"'Helvetica Neue',sans-serif", textAlign:"center", marginTop:10 }}>
               🎁 Essai gratuit 7 jours inclus · Sans carte bancaire requise
             </div>
           </div>
@@ -1499,7 +1499,7 @@ function SubscriptionView({ profile, subscription, isMobile, notify, onActivated
                 onClick={()=>setAddQtyMore(q=>Math.min(50,q+1))}>+</button>
               <div style={{ flex:1, padding:"10px 14px", background:"#F5F0E8", borderRadius:10, fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>
                 <strong>{(addQtyMore * 59.88).toFixed(2)}€ HT</strong>
-                <div style={{ fontSize:10, color:"#888" }}>{addQtyMore} × 59,88€/an</div>
+                <div style={{ fontSize:10, color:"#CCCCCC" }}>{addQtyMore} × 59,88€/an</div>
               </div>
             </div>
             <button style={{ ...BP, width:"100%" }} disabled={addingMore} onClick={async()=>{
@@ -1743,7 +1743,7 @@ function CRMConfigView({ profile, isMobile, notify }) {
       {/* Doc API publique */}
       <div style={{ ...C, marginTop:16, background:"#1A1A1A" }}>
         <h3 style={{ ...CT, color:"#888" }}>API Publique Prospeo</h3>
-        <div style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:10 }}>
+        <div style={{ fontSize:12, color:"#CCCCCC", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:10 }}>
           Votre CRM peut aussi recevoir les données via cette URL webhook :
         </div>
         <div style={{ fontFamily:"'Courier New',monospace", fontSize:12, color:"#FF4C1A", background:"#111", padding:12, borderRadius:8, marginBottom:8, wordBreak:"break-all" }}>
@@ -1890,7 +1890,7 @@ function SuperAdminView({ profile, isMobile, notify }) {
             ].map(st => (
               <div key={st.label} style={{ background:st.bg, borderRadius:12, padding:14 }}>
                 <div style={{ fontSize:26, fontWeight:700, color:st.fg }}>{st.value}</div>
-                <div style={{ fontSize:10, color:st.fg, opacity:0.7, fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5, marginTop:3 }}>{st.label}</div>
+                <div style={{ fontSize:10, color:"#FFFFFF", opacity:0.85, fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5, marginTop:3 }}>{st.label}</div>
               </div>
             ))}
           </div>
@@ -2006,7 +2006,7 @@ function SuperAdminView({ profile, isMobile, notify }) {
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontSize:13, fontWeight:600, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>{p.full_name||"—"}</div>
-                      <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{p.email} · {p.role}</div>
+                      <div style={{ fontSize:11, color:"#CCCCCC", fontFamily:"'Helvetica Neue',sans-serif" }}>{p.email} · {p.role}</div>
                       <div style={{ fontSize:11, color:statusColor(sub), fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}>{statusLabel(sub)}</div>
                     </div>
                     <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
@@ -2137,7 +2137,7 @@ function SuperAdminView({ profile, isMobile, notify }) {
                       {k.used?"Utilisée":"Disponible"}
                     </div>
                   </div>
-                  <div style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", marginTop:3 }}>
+                  <div style={{ fontSize:11, color:"#BBBBBB", fontFamily:"'Helvetica Neue',sans-serif", marginTop:3 }}>
                     {k.key_type} · {k.email||"—"} · expire {new Date(k.expires_at).toLocaleDateString("fr-FR")}
                     {k.notes && ` · ${k.notes}`}
                   </div>
