@@ -2,12 +2,16 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "./supabase.js";
 import { LANGUAGES, t, detectBrowserLang, getSavedLang, saveLang } from "./i18n.js";
 
-const STATUS_COLORS = {
-  chaud:    { bg: "#FF4C1A", text: "#fff", label: "Chaud"    },
-  "tiède":  { bg: "#FF9500", text: "#fff", label: "Tiède"    },
-  froid:    { bg: "#1A6AFF", text: "#fff", label: "Froid"    },
-  converti: { bg: "#00C48C", text: "#fff", label: "Converti" },
+const STATUS_COLORS_BASE = {
+  chaud:    { bg: "#FF4C1A", text: "#fff", key: "status_chaud"    },
+  tiede:    { bg: "#FF9500", text: "#fff", key: "status_tiede"    },
+  froid:    { bg: "#E8E0D4", text: "#888", key: "status_froid"    },
+  converti: { bg: "#00C48C", text: "#fff", key: "status_converti" },
 };
+const getStatusColors = (lang="fr") => Object.fromEntries(
+  Object.entries(STATUS_COLORS_BASE).map(([k,v]) => [k, {...v, label: t(v.key, lang)}])
+);
+const STATUS_COLORS = getStatusColors("fr");
 const SOURCE_ICONS = { carte: "📇", manuel: "✏️", vocal: "🎙️" };
 const getPeriods = (lang="fr") => [
   { id: "today",     label: t("today",lang)          },
@@ -283,7 +287,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
     { id:"list",          icon:"≡", label:t("nav_prospects",lang)     },
     { id:"report",        icon:"◉", label:t("nav_reports",lang)       },
     { id:"profile",       icon:"👤", label:t("nav_profile",lang)      },
-    { id:"crm",           icon:"🔗", label:t("nav_crm",lang)          },
+    ...(isSuperManager(profile) || profile?.crm_enabled ? [{ id:"crm", icon:"🔗", label:t("nav_crm",lang) }] : []),
     ...(profile?.role !== "manager" ? [{ id:"subscription", icon:"⭐", label:t("nav_subscription",lang) }] : []),
     ...(isSuperManager(profile) ? [{ id:"superadmin", icon:"🔐", label:t("nav_superadmin",lang) }] : []),
   ];
@@ -359,7 +363,11 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
         {view==="subscription"  && <SubscriptionView profile={profile} subscription={subscription} isMobile={isMobile} lang={lang} notify={notify} onActivated={loadSubscription} />}
         {view==="activate"      && <ActivateKeyView profile={profile} isMobile={isMobile} notify={notify} onActivated={()=>{ loadSubscription(); setView("dashboard"); }} />}
         {view==="superadmin" && isSuperManager(profile) && <SuperAdminView profile={profile} isMobile={isMobile} lang={lang} notify={notify} />}
-        {view==="crm"         && <CRMConfigView profile={profile} isMobile={isMobile} lang={lang} notify={notify} />}
+        {view==="crm"         && (
+          isSuperManager(profile) || profile?.crm_enabled
+            ? <CRMConfigView profile={profile} isMobile={isMobile} lang={lang} notify={notify} />
+            : <CRMLockedView isMobile={isMobile} lang={lang} />
+        )}
       </main>
 
       {/* Mobile bottom nav */}
@@ -428,7 +436,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
         const q = globalSearch.trim().toLowerCase();
         const statusMap = {
           chaud: ["chaud","hot","caliente","quente","caldo","heiß","varm","het"],
-          tiede: ["tiède","tiede","warm","tibio","morno","tiepido","lunken","ljummen","lauw"],
+          tiede: ["tiede","tiede","warm","tibio","morno","tiepido","lunken","ljummen","lauw"],
           froid: ["froid","cold","frío","frio","freddo","kalt","kald","kall","koud"],
           converti: ["converti","converted","convertido","convertito","konvertiert","konvertert","konverterad","geconverteerd"],
         };
@@ -482,7 +490,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
                           <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{c.company||"—"} · {c.email||c.phone||""}</div>
                           {profile?.role==="manager" && c.profiles?.full_name && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>👤 {c.profiles.full_name}</div>}
                         </div>
-                        <div style={{ ...SB, background:STATUS_COLORS[c.status]?.bg, color:STATUS_COLORS[c.status]?.text, flexShrink:0 }}>{STATUS_COLORS[c.status]?.label}</div>
+                        <div style={{ ...SB, background:getStatusColors(lang||"fr")[c.status]?.bg, color:getStatusColors(lang||"fr")[c.status]?.text, flexShrink:0 }}>{getStatusColors(lang||"fr")[c.status]?.label}</div>
                       </div>
                     ))}
                   </div>
@@ -498,7 +506,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
                           <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.company||"—"} · {c.email||c.phone||""}</div>
                           {profile?.role==="manager" && c.profiles?.full_name && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>👤 {c.profiles.full_name}</div>}
                         </div>
-                        <div style={{ ...SB, background:STATUS_COLORS[c.status]?.bg, color:STATUS_COLORS[c.status]?.text, flexShrink:0 }}>{STATUS_COLORS[c.status]?.label}</div>
+                        <div style={{ ...SB, background:getStatusColors(lang||"fr")[c.status]?.bg, color:getStatusColors(lang||"fr")[c.status]?.text, flexShrink:0 }}>{getStatusColors(lang||"fr")[c.status]?.label}</div>
                       </div>
                     ))}
                   </div>
@@ -524,7 +532,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
                   </div>
                 )}
               </div>
-              <div style={{ ...SB, background:STATUS_COLORS[c.status]?.bg, color:STATUS_COLORS[c.status]?.text, flexShrink:0 }}>{STATUS_COLORS[c.status]?.label}</div>
+              <div style={{ ...SB, background:getStatusColors(lang||"fr")[c.status]?.bg, color:getStatusColors(lang||"fr")[c.status]?.text, flexShrink:0 }}>{getStatusColors(lang||"fr")[c.status]?.label}</div>
             </div>
           ))
         }
@@ -558,7 +566,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
       <div style={{ ...C, marginTop:14 }}>
         <h3 style={CT}>{t("quick_actions",lang)}</h3>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-          {[{icon:"✏️",label:"Saisie manuelle",to:"add"},{icon:"📇",label:"Scanner carte",to:"add"},{icon:"📊",label:"Export Excel",to:"report"},{icon:"◉",label:"Rapports",to:"report"}].map(q=>(
+          {[{icon:"✏️",label:t("manual",lang),to:"add"},{icon:"📇",label:t("card_ai",lang),to:"add"},{icon:"📊",label:t("export_excel",lang),to:"report"},{icon:"◉",label:"Rapports",to:"report"}].map(q=>(
             <button key={q.label} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6, padding:isMobile?13:15, border:"2px solid #F0EBE0", borderRadius:12, background:"#F5F0E8", cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }} onClick={()=>go(q.to)}>
               <span style={{ fontSize:22 }}>{q.icon}</span><span>{q.label}</span>
             </button>
@@ -579,6 +587,7 @@ function AddView({ profile, isMobile, notify, lang="fr", onAdded }) {
   const [vocalAnalyzing, setVocalAnalyzing] = useState(false);
   const [showPWABanner, setShowPWABanner] = useState(false);
   const [duplicate, setDuplicate]         = useState(null);
+  const STATUS_COLORS = getStatusColors(lang);
   const fileRef = useRef(null);
   const recRef  = useRef(null);
   const vocalRecRef = useRef(null);
@@ -977,9 +986,9 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
       </div>
 
       <div style={{ marginBottom:22 }}>
-        <label style={L}>Statut</label>
+        <label style={L}>{t("status",lang)}</label>
         <div style={{ display:"flex", gap:7, flexWrap:"wrap", marginTop:6 }}>
-          {Object.entries(STATUS_COLORS).map(([key,val])=>(
+          {Object.entries(getStatusColors(lang||"fr")).map(([key,val])=>(
             <button key={key} style={{ padding:"7px 14px", borderRadius:20, cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, background:form.status===key?val.bg:"transparent", color:form.status===key?val.text:"#888", border:`2px solid ${val.bg}` }}
               onClick={()=>f("status",key)}>{val.label}</button>
           ))}
@@ -996,6 +1005,7 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
 function ListView({ contacts, profile, loadingData, isMobile, lang="fr", onSelect, onAdd }) {
   const [search, setSearch] = useState("");
   const [fs, setFs]         = useState("all");
+  const STATUS_COLORS = getStatusColors(lang);
 
   const filtered = contacts.filter(c => {
     const ms = fs==="all"||c.status===fs;
@@ -1006,12 +1016,12 @@ function ListView({ contacts, profile, loadingData, isMobile, lang="fr", onSelec
   return (
     <div style={P(isMobile)}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
-        <h1 style={T(isMobile)}>{profile?.role==="manager"?"Tous les prospects":"Mes prospects"}</h1>
+        <h1 style={T(isMobile)}>{profile?.role==="manager"?t("nav_prospects",lang):"Mes prospects"}</h1>
         {!isMobile && <button style={BP} onClick={onAdd}>＋ Nouveau</button>}
       </div>
       <input style={{ ...I, marginBottom:10, width:"100%" }} placeholder={"🔍  " + t("search",lang)} value={search} onChange={e=>setSearch(e.target.value)} />
       <div style={{ display:"flex", gap:6, marginBottom:14, overflowX:"auto", paddingBottom:4 }}>
-        {["all","chaud","tiède","froid","converti"].map(st=>(
+        {["all","chaud","tiede","froid","converti"].map(st=>(
           <button key={st} style={{ padding:"6px 11px", border:`2px solid ${fs===st?"#1A1A1A":"#E8E0D4"}`, borderRadius:20, background:fs===st?"#1A1A1A":"transparent", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:fs===st?"#E8E0D4":"#888", flexShrink:0 }}
             onClick={()=>setFs(st)}>{st==="all"?"Tous":STATUS_COLORS[st]?.label}</button>
         ))}
@@ -1028,7 +1038,7 @@ function ListView({ contacts, profile, loadingData, isMobile, lang="fr", onSelec
                 {profile?.role==="manager" && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>👤 {c.profiles?.full_name}</div>}
               </div>
               <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4, flexShrink:0 }}>
-                <div style={{ ...SB, background:STATUS_COLORS[c.status]?.bg, color:STATUS_COLORS[c.status]?.text }}>{STATUS_COLORS[c.status]?.label}</div>
+                <div style={{ ...SB, background:getStatusColors(lang||"fr")[c.status]?.bg, color:getStatusColors(lang||"fr")[c.status]?.text }}>{getStatusColors(lang||"fr")[c.status]?.label}</div>
                 <div style={{ fontSize:10, color:"#bbb", fontFamily:"'Helvetica Neue',sans-serif" }}>{new Date(c.created_at).toLocaleDateString("fr-FR")}</div>
               </div>
             </div>
@@ -1042,6 +1052,7 @@ function ListView({ contacts, profile, loadingData, isMobile, lang="fr", onSelec
 function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBack, onStatusUpdate, onDelete, notify }) {
   const [c, setC]              = useState(initialContact);
   const [synthesis, setSyn]    = useState(null);
+  const STATUS_COLORS = getStatusColors(lang);
   const [synLoad, setSynLoad]  = useState(false);
   const [past, setPast]        = useState([]);
   const [editing, setEditing]  = useState(false);
@@ -1138,7 +1149,7 @@ function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBa
           <h1 style={{ fontSize:isMobile?21:26, fontWeight:400, color:"#1A1A1A", margin:0, fontFamily:"Georgia,serif" }}>{c.first_name} {c.last_name}</h1>
           <p style={{ fontSize:13, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", margin:"3px 0 7px" }}>{c.role}{c.company?` · ${c.company}`:""}</p>
           <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-            <div style={{ ...SB, background:STATUS_COLORS[c.status]?.bg, color:STATUS_COLORS[c.status]?.text }}>{STATUS_COLORS[c.status]?.label}</div>
+            <div style={{ ...SB, background:getStatusColors(lang||"fr")[c.status]?.bg, color:getStatusColors(lang||"fr")[c.status]?.text }}>{getStatusColors(lang||"fr")[c.status]?.label}</div>
             <div style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", alignSelf:"center" }}>{SOURCE_ICONS[c.source]} {c.source}</div>
             {profile?.role==="manager" && c.profiles?.full_name && (
           <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 10px", background:"#FFF4EE", borderRadius:20 }}>
@@ -1152,7 +1163,7 @@ function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBa
       <div style={{ ...C, marginBottom:14 }}>
         <label style={L}>{t("edit_status",lang)}</label>
         <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:8 }}>
-          {Object.entries(STATUS_COLORS).map(([key,val])=>(
+          {Object.entries(getStatusColors(lang||"fr")).map(([key,val])=>(
             <button key={key} style={{ padding:"7px 13px", borderRadius:20, cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, background:c.status===key?val.bg:"transparent", color:c.status===key?val.text:"#888", border:`2px solid ${val.bg}` }}
               onClick={()=>{ onStatusUpdate(c.id,key); setC(p=>({...p,status:key})); }}>{val.label}</button>
           ))}
@@ -1189,6 +1200,7 @@ function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBa
 function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", setGlobalSearch, notify, onSelectContact }) {
   const [period, setPeriod]   = useState("month");
   const [cs, setCs]           = useState("");
+  const STATUS_COLORS = getStatusColors(lang);
   const [ce, setCe]           = useState("");
   const [preview, setPreview] = useState(false);
   const [sending, setSending] = useState(false);
@@ -1198,7 +1210,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
   const { start, end } = getPeriodRange(period, cs, ce);
   const statusAliases = {
     chaud:["chaud","hot","caliente","quente","caldo"],
-    tiede:["tiède","tiede","warm","tibio","morno","tiepido"],
+    tiede:["tiede","tiede","warm","tibio","morno","tiepido"],
     froid:["froid","cold","frío","frio","freddo","kalt"],
     converti:["converti","converted","convertido","convertito"],
   };
@@ -1321,7 +1333,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
                 <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.company||"—"} · {new Date(c.created_at).toLocaleDateString("fr-FR")}</div>
                 {profile?.role==="manager" && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>{c.profiles?.full_name}</div>}
               </div>
-              <div style={{ ...SB, background:STATUS_COLORS[c.status]?.bg, color:STATUS_COLORS[c.status]?.text, flexShrink:0 }}>{STATUS_COLORS[c.status]?.label}</div>
+              <div style={{ ...SB, background:getStatusColors(lang||"fr")[c.status]?.bg, color:getStatusColors(lang||"fr")[c.status]?.text, flexShrink:0 }}>{getStatusColors(lang||"fr")[c.status]?.label}</div>
             </div>
           ))
         }
@@ -1585,7 +1597,7 @@ function SubscriptionView({ profile, subscription, isMobile, lang="fr", notify, 
 
       {/* Statut actuel */}
       <div style={{ ...C, marginBottom:16 }}>
-        <h3 style={CT}>Statut actuel</h3>
+        <h3 style={CT}>{t("sub_status",lang)}</h3>
         <div style={{ fontSize:15, fontFamily:"'Helvetica Neue',sans-serif", color:sl.color, fontWeight:600, marginBottom:8 }}>{sl.text}</div>
         <div style={{ fontSize:13, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{profile?.email}</div>
       </div>
@@ -1715,7 +1727,80 @@ function ActivateKeyView({ profile, isMobile, lang="fr", notify, onActivated, in
   );
 }
 
+function CRMLockedView({ isMobile, lang="fr" }) {
+  return (
+    <div style={P(isMobile)}>
+      <h1 style={T(isMobile)}>🔗 {t("crm_title",lang)}</h1>
+      <div style={{ ...C, textAlign:"center", padding:40 }}>
+        <div style={{ fontSize:48, marginBottom:16 }}>🔒</div>
+        <h2 style={{ fontSize:20, fontWeight:600, color:"#1A1A1A", fontFamily:"Georgia,serif", margin:"0 0 12px" }}>
+          Option CRM — Sur devis
+        </h2>
+        <p style={{ fontSize:14, color:"#666", fontFamily:"'Helvetica Neue',sans-serif", lineHeight:1.7, margin:"0 0 24px", maxWidth:400, marginLeft:"auto", marginRight:"auto" }}>
+          L'intégration CRM est une option payante disponible sur devis. Elle permet de synchroniser automatiquement vos prospects avec HubSpot, Salesforce, Pipedrive, Zoho et Odoo.
+        </p>
+        <div style={{ background:"#F5F0E8", borderRadius:12, padding:20, marginBottom:24, display:"inline-block", textAlign:"left", minWidth:280 }}>
+          <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:1, marginBottom:12, fontWeight:600 }}>Tarification</div>
+          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
+            <span style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>Licence de base</span>
+            <span style={{ fontSize:13, fontWeight:700, color:"#1A1A1A" }}>4,99€ HT/mois</span>
+          </div>
+          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
+            <span style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>Option CRM</span>
+            <span style={{ fontSize:13, fontWeight:700, color:"#FF4C1A" }}>+ 1,99€ HT/mois/licence</span>
+          </div>
+          <div style={{ borderTop:"1px solid #E8E0D4", marginTop:8, paddingTop:8, display:"flex", justifyContent:"space-between" }}>
+            <span style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>Frais de paramétrage</span>
+            <span style={{ fontSize:13, fontWeight:700, color:"#888" }}>Sur devis</span>
+          </div>
+        </div>
+        <p style={{ fontSize:12, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 20px" }}>
+          Contactez votre administrateur Prospeo pour activer cette option.
+        </p>
+        <a href="mailto:contact@prospeo.me" style={{ display:"inline-block", padding:"12px 24px", background:"#1A1A1A", color:"#E8E0D4", borderRadius:10, fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, textDecoration:"none" }}>
+          📧 Demander un devis
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
+  // CRM is a paid add-on — only show if super manager or crm_enabled
+  if (!isSuperManager(profile)) {
+    return (
+      <div style={P(isMobile)}>
+        <h1 style={T(isMobile)}>{t("crm_title",lang)}</h1>
+        <div style={{ ...C, textAlign:"center", padding:40 }}>
+          <div style={{ fontSize:48, marginBottom:16 }}>🔗</div>
+          <h2 style={{ fontSize:20, fontWeight:600, color:"#1A1A1A", fontFamily:"Georgia,serif", margin:"0 0 12px" }}>
+            Option CRM
+          </h2>
+          <p style={{ fontSize:14, color:"#666", fontFamily:"'Helvetica Neue',sans-serif", lineHeight:1.7, margin:"0 0 24px", maxWidth:400, marginLeft:"auto", marginRight:"auto" }}>
+            L'intégration CRM est une option payante disponible sur demande. Elle permet de synchroniser automatiquement vos prospects avec HubSpot, Salesforce, Pipedrive, Zoho et Odoo.
+          </p>
+          <div style={{ background:"#F5F0E8", borderRadius:12, padding:20, marginBottom:24, display:"inline-block", textAlign:"left" }}>
+            <div style={{ fontSize:13, fontWeight:700, color:"#1A1A1A", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:10 }}>Tarification</div>
+            <div style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:6 }}>
+              ➕ <strong>+1,99€ HT/mois/licence</strong> en supplément du forfait de base
+            </div>
+            <div style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>
+              🛠️ <strong>Frais d'accès et de paramétrage</strong> sur devis
+            </div>
+          </div>
+          <div>
+            <a href="mailto:contact@prospeo.me?subject=Demande option CRM&body=Bonjour, je souhaite activer l'option CRM pour mon compte Prospeo."
+              style={{ display:"inline-block", padding:"12px 28px", background:"#FF4C1A", color:"#fff", borderRadius:10, textDecoration:"none", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:700 }}>
+              📧 Demander un devis CRM
+            </a>
+          </div>
+          <p style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", marginTop:16 }}>
+            Notre équipe vous recontactera sous 24h pour étudier votre besoin.
+          </p>
+        </div>
+      </div>
+    );
+  }
   const [configs, setConfigs]   = useState([]);
   const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
