@@ -25,15 +25,15 @@
   ],
   "screenshots": [
     {
-      "src": "/icons/icon-512.png",
-      "sizes": "512x512",
+      "src": "/icons/screenshot-mobile.png",
+      "sizes": "1080x1920",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "Tableau de bord Prospeo"
     },
     {
-      "src": "/icons/icon-512.png",
-      "sizes": "512x512",
+      "src": "/icons/screenshot-desktop.png",
+      "sizes": "1920x1080",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Gestion de prospects terrain"
@@ -43,13 +43,13 @@
     {
       "name": "Ajouter un prospect",
       "short_name": "Ajouter",
-      "description": "Ajouter rapidement un nouveau prospect",
+      "description": "Ajouter rapidement un nouveau prospect manuellement, avec une carte de visite ou en dictant vocalement les informations",
       "url": "/?action=add"
     },
     {
       "name": "Tableau de bord",
       "short_name": "Dashboard",
-      "description": "Voir le tableau de bord",
+      "description": "Centralise les informations du commercial et du manager en temps réel",
       "url": "/"
     }
   ]
