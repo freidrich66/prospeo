@@ -385,7 +385,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
         <p style={Sub}>{new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</p>
       </div>
 
-      {profile?.role !== "manager" && subscription && (() => {
+      {profile?.role !== "manager" && subscription && subscription.status !== "lifetime" && !(subscription.current_period_end && new Date(subscription.current_period_end) > new Date("2099-01-01")) && (() => {
         const now = new Date();
         const trialEnd = subscription.trial_ends_at ? new Date(subscription.trial_ends_at) : null;
         const daysLeft = trialEnd ? Math.ceil((trialEnd - now) / 86400000) : 0;
@@ -1567,6 +1567,7 @@ function SubscriptionView({ profile, subscription, isMobile, notify, onActivated
 
   const statusLabel = () => {
     if (!subscription) return { text:"Chargement...", color:"#888" };
+    if (subscription.status==="lifetime" || (subEnd && subEnd > new Date("2099-01-01"))) return { text:"♾️ Licence gratuite à vie", color:"#FF4C1A" };
     if (subscription.status==="active")    return { text:`✅ Actif — expire le ${subEnd?.toLocaleDateString("fr-FR")}`, color:"#00C48C" };
     if (subscription.status==="trial")     return { text:`🎁 Essai gratuit — ${daysLeft} jour${daysLeft>1?"s":""} restant${daysLeft>1?"s":""}`, color:"#1A6AFF" };
     if (subscription.status==="expired")   return { text:"❌ Expiré", color:"#FF2D2D" };
@@ -1966,6 +1967,13 @@ function SuperAdminView({ profile, isMobile, notify }) {
     setAddLoading(false);
   };
 
+  const grantLifetime = async (userId, name) => {
+    if (!confirm(`Attribuer une licence GRATUITE À VIE à ${name} ?`)) return;
+    const res = await call("grantLifetime", { userId });
+    if (res.success) { notify(`✅ Licence gratuite à vie attribuée à ${name}`); call("getData").then(d => setData(d)); }
+    else notify(res.error, "error");
+  };
+
   const disableAccount = async (userId, name) => {
     if (!confirm(`Désactiver le compte de ${name} ?`)) return;
     const res = await call("disableAccount", { userId });
@@ -2001,6 +2009,8 @@ function SuperAdminView({ profile, isMobile, notify }) {
   };
   const statusLabel = (s) => {
     if (!s) return "Aucun";
+    if (s.status === "lifetime") return "♾️ Licence gratuite à vie";
+    if (s.status === "active" && s.current_period_end && new Date(s.current_period_end) > new Date("2099-01-01")) return "♾️ Licence gratuite à vie";
     if (s.status === "active")  return `✅ Actif jusqu'au ${new Date(s.current_period_end).toLocaleDateString("fr-FR")}`;
     if (s.status === "trial")   return `🎁 Trial jusqu'au ${new Date(s.trial_ends_at).toLocaleDateString("fr-FR")}`;
     if (s.status === "expired") return "❌ Expiré";
@@ -2149,6 +2159,8 @@ function SuperAdminView({ profile, isMobile, notify }) {
                     <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
                       <button style={{ padding:"4px 8px", background:"#00C48C", color:"#fff", border:"none", borderRadius:5, cursor:"pointer", fontSize:10, fontFamily:"'Helvetica Neue',sans-serif" }}
                         onClick={()=>extendAccount(p.id, p.full_name||p.email)}>+12 mois</button>
+                      <button style={{ padding:"4px 8px", background:"#FF9500", color:"#fff", border:"none", borderRadius:5, cursor:"pointer", fontSize:10, fontFamily:"'Helvetica Neue',sans-serif" }}
+                        onClick={()=>grantLifetime(p.id, p.full_name||p.email)}>♾️ À vie</button>
                       <button style={{ padding:"4px 8px", background:"#FF2D2D", color:"#fff", border:"none", borderRadius:5, cursor:"pointer", fontSize:10, fontFamily:"'Helvetica Neue',sans-serif" }}
                         onClick={()=>disableAccount(p.id, p.full_name||p.email)}>Désactiver</button>
                     </div>
