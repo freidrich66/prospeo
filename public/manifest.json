@@ -23,33 +23,40 @@
     { "src": "/icons/icon-384.png",  "sizes": "384x384", "type": "image/png", "purpose": "any maskable" },
     { "src": "/icons/icon-512.png",  "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
-  "screenshots": [
-    {
-      "src": "/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Tableau de bord Prospeo"
-    },
-    {
-      "src": "/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Gestion de prospects terrain"
-    }
-  ],
+ "screenshots": [
+  {
+    "src": "/icons/screenshot-mobile-1.png",
+    "sizes": "1080x1920",
+    "type": "image/png",
+    "form_factor": "narrow",
+    "label": "Tableau de bord"
+  },
+  {
+    "src": "/icons/screenshot-mobile-2.png",
+    "sizes": "1080x1920",
+    "type": "image/png",
+    "form_factor": "narrow",
+    "label": "Ajouter un prospect"
+  },
+  {
+    "src": "/icons/screenshot-desktop-1.png",
+    "sizes": "1920x1080",
+    "type": "image/png",
+    "form_factor": "wide",
+    "label": "Rapport et Export"
+  }
+]
   "shortcuts": [
     {
       "name": "Ajouter un prospect",
       "short_name": "Ajouter",
-      "description": "Ajouter rapidement un nouveau prospect",
+      "description": "Ajouter rapidement un nouveau prospect manuellement, avec une carte de visite ou en dictant vocalement les informations",
       "url": "/?action=add"
     },
     {
       "name": "Tableau de bord",
       "short_name": "Dashboard",
-      "description": "Voir le tableau de bord",
+      "description": "Ce tableau de bord permet de centraliser les informations du commercial et/ou du manager",
       "url": "/"
     }
   ]
