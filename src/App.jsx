@@ -204,7 +204,7 @@ function AuthPage({ lang="fr", changeLang }) {
           <span style={{ fontSize:20, fontWeight:700, letterSpacing:3, color:"#1A1A1A", fontFamily:"'Helvetica Neue',sans-serif" }}>PROSPEO</span>
         </div>
         <h2 style={{ fontSize:22, fontWeight:400, color:"#1A1A1A", margin:"0 0 24px", fontFamily:"Georgia,serif" }}>{mode === "login" ? t("login",lang) : t("register",lang)}</h2>
-        {mode === "register" && <div style={{ marginBottom:14 }}><label style={L}>Nom complet</label><input style={I} placeholder="Jean Dupont" value={name} onChange={e=>setName(e.target.value)} /></div>}
+        {mode === "register" && <div style={{ marginBottom:14 }}><label style={L}>{t("first_name",lang)+" "+t("last_name",lang)}</label><input style={I} placeholder="Jean Dupont" value={name} onChange={e=>setName(e.target.value)} /></div>}
         <div style={{ marginBottom:14 }}><label style={L}>Email</label><input style={I} type="email" placeholder="jean@entreprise.fr" value={email} onChange={e=>setEmail(e.target.value)} /></div>
         <div style={{ marginBottom:14 }}><label style={L}>Mot de passe</label><input style={I} type="password" placeholder="••••••••" value={password} onChange={e=>setPwd(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} /></div>
         {error && <div style={{ padding:"10px 14px", borderRadius:8, background:error.startsWith("✅")?"#EBF8F4":"#FFF0F0", color:error.startsWith("✅")?"#00875A":"#FF2D2D", fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", marginBottom:14 }}>{error}</div>}
@@ -267,7 +267,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
     await supabase.from("contacts").update({status}).eq("id", id);
     setContacts(p => p.map(c => c.id===id ? {...c, status} : c));
     if (selected?.id===id) setSelected(p => ({...p, status}));
-    notify("Statut mis à jour !");
+    notify("✅ " + t("status",lang));
   };
 
   const stats = {
@@ -1106,12 +1106,12 @@ function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBa
           <h3 style={CT}>{t("edit_prospect",lang)}</h3>
           <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:12, marginBottom:12 }}>
             {[
-              { k:"first_name", l:"Prénom *",   ph:"Jean" },
-              { k:"last_name",  l:"Nom *",       ph:"Dupont" },
-              { k:"company",    l:"Entreprise",  ph:"Acme Corp" },
-              { k:"role",       l:"Poste",       ph:"Directeur Commercial" },
+              { k:"first_name", l:t("first_name",lang)+" *", ph:"Jean" },
+              { k:"last_name",  l:t("last_name",lang)+" *", ph:"Dupont" },
+              { k:"company",    l:t("company",lang), ph:"Acme Corp" },
+              { k:"role",       l:t("role",lang), ph:"Director" },
               { k:"email",      l:t("email",lang),       ph:"jean@acme.fr" },
-              { k:"phone",      l:"Téléphone",   ph:"+33 6 00 00 00 00" },
+              { k:"phone",      l:t("phone",lang), ph:"+33 6 00 00 00 00" },
             ].map(field => (
               <div key={field.k}>
                 <label style={L}>{field.l}</label>
@@ -1120,7 +1120,7 @@ function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBa
             ))}
           </div>
           <div style={{ marginBottom:14 }}>
-            <label style={L}>Notes</label>
+            <label style={L}>{t("notes",lang)}</label>
             <textarea style={{ ...I, minHeight:80, resize:"vertical" }} placeholder="..." value={editForm.notes} onChange={e=>ef("notes",e.target.value)} />
           </div>
           <div style={{ display:"flex", gap:10 }}>
@@ -1160,7 +1160,7 @@ function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBa
       </div>
 
       <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:10, marginBottom:14 }}>
-        {[{icon:"✉️",label:t("email",lang),value:c.email},{icon:"📞",label:"Téléphone",value:c.phone},{icon:"🏢",label:"Entreprise",value:c.company},{icon:"📅",label:"Date",value:new Date(c.created_at).toLocaleDateString("fr-FR")}]
+        {[{icon:"✉️",label:t("email",lang),value:c.email},{icon:"📞",label:t("phone",lang),value:c.phone},{icon:"🏢",label:t("company",lang),value:c.company},{icon:"📅",label:t("date",lang),value:new Date(c.created_at).toLocaleDateString("fr-FR")}]
           .filter(r=>r.value).map(row=>(
           <div key={row.label} style={{ display:"flex", gap:11, alignItems:"flex-start", padding:13, background:"#fff", borderRadius:10 }}>
             <span style={{ fontSize:17 }}>{row.icon}</span>
@@ -1228,7 +1228,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
   };
 
   const exportExcel = () => {
-    let csv = ["Prénom","Nom","Entreprise","Poste",t("email",lang),"Téléphone","Source",t("status",lang),"Notes","Commercial","Date"].join(";")+"\n";
+    let csv = [t("first_name",lang),t("last_name",lang),t("company",lang),t("role",lang),t("email",lang),t("phone",lang),"Source",t("status",lang),t("notes",lang),"Commercial",t("date",lang)].join(";")+"\n";
     filtered.forEach(c=>{ csv+=[c.first_name,c.last_name,c.company,c.role,c.email,c.phone,c.source,c.status,c.notes,c.profiles?.full_name||"",new Date(c.created_at).toLocaleDateString("fr-FR")].map(v=>`"${String(v||"").replace(/"/g,'""')}"`).join(";")+"\n"; });
     const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"})); a.download=`prospects_${period}_${new Date().toISOString().split("T")[0]}.csv`; a.click();
     notify("📊 Export téléchargé !");
@@ -1469,7 +1469,7 @@ function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, onUpdat
     <div style={P(isMobile)}>
       <div style={{ marginBottom:22 }}>
         <h1 style={T(isMobile)}>{t("profile_title",lang)}</h1>
-        <p style={Sub}>Vos informations personnelles</p>
+        <p style={Sub}>{t("personal_info",lang)}</p>
       </div>
 
       {/* Avatar + infos de base */}
@@ -1515,7 +1515,7 @@ function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, onUpdat
         <div style={{ marginTop:16, padding:"12px 14px", background:"#F5F0E8", borderRadius:10 }}>
           <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, textTransform:"uppercase", letterSpacing:1, marginBottom:4 }}>Email</div>
           <div style={{ fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", color:"#aaa" }}>{profile?.email}</div>
-          <div style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>L'email ne peut pas être modifié</div>
+          <div style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>{t("email_readonly",lang)}</div>
         </div>
 
         <div style={{ marginTop:16 }}>
@@ -1898,7 +1898,7 @@ function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
 function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
   const [data, setData]           = useState(null);
   const [loading, setLoading]     = useState(true);
-  const [tab, setTab]             = useState("keys");
+  const [tab, setTab]             = useState("stats");
   const [genQty, setGenQty]       = useState(1);
   const [genEmail, setGenEmail]   = useState("");
   const [genCompany, setGenCompany] = useState("");
@@ -2044,11 +2044,221 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
 
           {/* Tabs */}
           <div style={{ display:"flex", gap:6, marginBottom:16, flexWrap:"wrap" }}>
-            {[["keys","🔑 Générer KEYs"],["addlicences","➕ Ajouter licences"],["users","👥 Utilisateurs"],["allkeys","📋 Toutes les KEYs"]].map(([id,label]) => (
+            {[["stats","📊 KPIs"],["keys","🔑 Générer KEYs"],["addlicences","➕ Ajouter licences"],["users","👥 Utilisateurs"],["allkeys","📋 Toutes les KEYs"]].map(([id,label]) => (
               <button key={id} style={{ padding:"8px 14px", border:`2px solid ${tab===id?"#1A1A1A":"#E8E0D4"}`, borderRadius:20, background:tab===id?"#1A1A1A":"transparent", color:tab===id?"#E8E0D4":"#888", cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
                 onClick={()=>setTab(id)}>{label}</button>
             ))}
           </div>
+
+          {/* ── KPIs SAAS ── */}
+          {tab === "stats" && (() => {
+            const now = new Date();
+            const subs = data.subscriptions || [];
+            const profiles = data.profiles || [];
+            const keys = data.keys || [];
+            const companies = data.companies || [];
+
+            // ── Core metrics ──
+            const totalUsers     = profiles.filter(p => p.email !== "fanne@lafitel.eu").length;
+            const trialUsers     = subs.filter(s => s.status === "trial").length;
+            const activeUsers    = subs.filter(s => s.status === "active").length;
+            const lifetimeUsers  = subs.filter(s => s.status === "lifetime" || (s.current_period_end && new Date(s.current_period_end) > new Date("2099-01-01"))).length;
+            const expiredUsers   = subs.filter(s => s.status === "expired").length;
+            const cancelledUsers = subs.filter(s => s.status === "cancelled").length;
+
+            // ── Conversion rate: trial → paid ──
+            const totalTrialEver    = subs.filter(s => s.trial_ends_at).length;
+            const convertedFromTrial = subs.filter(s => s.status === "active" && s.trial_ends_at).length;
+            const conversionRate    = totalTrialEver > 0 ? Math.round((convertedFromTrial / totalTrialEver) * 100) : 0;
+            const churnRate         = totalTrialEver > 0 ? Math.round((expiredUsers / totalTrialEver) * 100) : 0;
+
+            // ── MRR / ARR ──
+            const mrr = activeUsers * 4.99;
+            const arr = activeUsers * 59.88;
+
+            // ── Keys metrics ──
+            const totalKeys     = keys.length;
+            const usedKeys      = keys.filter(k => k.used).length;
+            const unusedKeys    = totalKeys - usedKeys;
+            const expiredKeys   = keys.filter(k => !k.used && new Date(k.expires_at) < now).length;
+            const keyActivationRate = totalKeys > 0 ? Math.round((usedKeys / totalKeys) * 100) : 0;
+
+            // ── Companies ──
+            const totalCompanies = companies.length;
+            const avgLicencesPerCompany = totalCompanies > 0
+              ? (companies.reduce((sum, c) => sum + (c.licence_count || 1), 0) / totalCompanies).toFixed(1)
+              : 0;
+
+            // ── Trial expiring soon (next 7 days) ──
+            const expiringSoon = subs.filter(s => {
+              if (s.status !== "trial") return false;
+              const end = new Date(s.trial_ends_at);
+              const diff = (end - now) / (1000*60*60*24);
+              return diff >= 0 && diff <= 7;
+            }).length;
+
+            // ── Monthly signups (last 6 months) ──
+            const monthlyData = [];
+            for (let i = 5; i >= 0; i--) {
+              const d = new Date();
+              d.setMonth(d.getMonth() - i);
+              const month = d.toLocaleDateString("fr-FR", { month:"short", year:"2-digit" });
+              const count = subs.filter(s => {
+                const created = new Date(s.created_at);
+                return created.getMonth() === d.getMonth() && created.getFullYear() === d.getFullYear();
+              }).length;
+              monthlyData.push({ month, count });
+            }
+
+            const maxMonthly = Math.max(...monthlyData.map(m => m.count), 1);
+
+            return (
+              <div>
+                {/* ── Hero KPIs ── */}
+                <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)", gap:10, marginBottom:16 }}>
+                  {[
+                    { label:"MRR", value:`${mrr.toFixed(0)}€`, sub:"Revenus mensuels", bg:"#FF4C1A", fg:"#fff" },
+                    { label:"ARR", value:`${arr.toFixed(0)}€`, sub:"Revenus annuels", bg:"#1A1A1A", fg:"#E8E0D4" },
+                    { label:"Actifs", value:activeUsers, sub:"Licences payantes", bg:"#00C48C", fg:"#fff" },
+                    { label:"Essais", value:trialUsers, sub:`${expiringSoon} expirent sous 7j`, bg:"#1A6AFF", fg:"#fff" },
+                  ].map(k => (
+                    <div key={k.label} style={{ background:k.bg, borderRadius:12, padding:16 }}>
+                      <div style={{ fontSize:10, color:k.fg, opacity:0.7, fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:1 }}>{k.label}</div>
+                      <div style={{ fontSize:28, fontWeight:700, color:k.fg, lineHeight:1.1, margin:"4px 0 2px" }}>{k.value}</div>
+                      <div style={{ fontSize:11, color:k.fg, opacity:0.7, fontFamily:"'Helvetica Neue',sans-serif" }}>{k.sub}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ── Conversion & Churn ── */}
+                <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:10, marginBottom:16 }}>
+                  <div style={{ ...C }}>
+                    <h3 style={CT}>Taux de conversion</h3>
+                    <div style={{ display:"flex", alignItems:"center", gap:16 }}>
+                      <div style={{ width:80, height:80, borderRadius:"50%", background:`conic-gradient(#00C48C ${conversionRate*3.6}deg, #F0EBE0 0deg)`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, position:"relative" }}>
+                        <div style={{ width:56, height:56, borderRadius:"50%", background:"#fff", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                          <span style={{ fontSize:16, fontWeight:700, color:"#1A1A1A" }}>{conversionRate}%</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:6 }}>
+                          <span style={{ color:"#00C48C", fontWeight:700 }}>{convertedFromTrial}</span> convertis sur <strong>{totalTrialEver}</strong> essais
+                        </div>
+                        <div style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>
+                          Taux de churn : <span style={{ color:"#FF2D2D", fontWeight:700 }}>{churnRate}%</span>
+                        </div>
+                        <div style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4 }}>
+                          Expirés sans achat : <strong>{expiredUsers}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ ...C }}>
+                    <h3 style={CT}>État des licences</h3>
+                    {[
+                      { label:"Actives (payantes)", value:activeUsers, color:"#00C48C" },
+                      { label:"En essai", value:trialUsers, color:"#1A6AFF" },
+                      { label:"À vie (offertes)", value:lifetimeUsers, color:"#FF4C1A" },
+                      { label:"Expirées", value:expiredUsers, color:"#FF2D2D" },
+                      { label:"Annulées", value:cancelledUsers, color:"#888" },
+                    ].map(item => (
+                      <div key={item.label} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+                        <div style={{ width:10, height:10, borderRadius:"50%", background:item.color, flexShrink:0 }} />
+                        <div style={{ flex:1, fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>{item.label}</div>
+                        <div style={{ fontSize:14, fontWeight:700, color:"#1A1A1A" }}>{item.value}</div>
+                        <div style={{ width:60, height:6, background:"#F0EBE0", borderRadius:3, overflow:"hidden" }}>
+                          <div style={{ height:"100%", width:`${totalUsers>0?(item.value/totalUsers)*100:0}%`, background:item.color, borderRadius:3 }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Inscriptions mensuelles ── */}
+                <div style={{ ...C, marginBottom:16 }}>
+                  <h3 style={CT}>Nouvelles inscriptions — 6 derniers mois</h3>
+                  <div style={{ display:"flex", alignItems:"flex-end", gap:8, height:100, paddingTop:10 }}>
+                    {monthlyData.map((m, i) => (
+                      <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+                        <div style={{ fontSize:11, fontWeight:700, color:"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>{m.count}</div>
+                        <div style={{ width:"100%", height:`${Math.round((m.count/maxMonthly)*70)+10}px`, background: i===5?"#FF4C1A":"#E8E0D4", borderRadius:"4px 4px 0 0", transition:"height 0.3s" }} />
+                        <div style={{ fontSize:10, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", textAlign:"center" }}>{m.month}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Clés & Entreprises ── */}
+                <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:10, marginBottom:16 }}>
+                  <div style={{ ...C }}>
+                    <h3 style={CT}>Clés d'activation</h3>
+                    {[
+                      { label:"Total générées", value:totalKeys, color:"#1A1A1A" },
+                      { label:"Utilisées", value:usedKeys, color:"#00C48C" },
+                      { label:"Disponibles", value:unusedKeys, color:"#1A6AFF" },
+                      { label:"Expirées (inutilisées)", value:expiredKeys, color:"#FF2D2D" },
+                    ].map(item => (
+                      <div key={item.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 0", borderBottom:"1px solid #F0EBE0" }}>
+                        <span style={{ fontSize:12, color:"#666", fontFamily:"'Helvetica Neue',sans-serif" }}>{item.label}</span>
+                        <span style={{ fontSize:15, fontWeight:700, color:item.color }}>{item.value}</span>
+                      </div>
+                    ))}
+                    <div style={{ marginTop:10, fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>
+                      Taux d'activation : <strong style={{ color:"#FF4C1A" }}>{keyActivationRate}%</strong>
+                    </div>
+                  </div>
+
+                  <div style={{ ...C }}>
+                    <h3 style={CT}>Entreprises</h3>
+                    {[
+                      { label:"Total entreprises", value:totalCompanies, color:"#1A1A1A" },
+                      { label:"Licences moy. / entreprise", value:avgLicencesPerCompany, color:"#FF4C1A" },
+                      { label:"Utilisateurs totaux", value:totalUsers, color:"#1A6AFF" },
+                      { label:"Essais expirant sous 7j", value:expiringSoon, color: expiringSoon>0?"#FF9500":"#00C48C" },
+                    ].map(item => (
+                      <div key={item.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 0", borderBottom:"1px solid #F0EBE0" }}>
+                        <span style={{ fontSize:12, color:"#666", fontFamily:"'Helvetica Neue',sans-serif" }}>{item.label}</span>
+                        <span style={{ fontSize:15, fontWeight:700, color:item.color }}>{item.value}</span>
+                      </div>
+                    ))}
+                    <div style={{ marginTop:10, fontSize:12, color:"#888", fontFamily:"'Helvetice Neue',sans-serif" }}>
+                      LTV estimée : <strong style={{ color:"#FF4C1A" }}>{(activeUsers * 59.88 * 2).toFixed(0)}€</strong>
+                      <span style={{ fontSize:10, color:"#aaa" }}> (base 2 ans)</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Alerte essais expirant bientôt ── */}
+                {expiringSoon > 0 && (
+                  <div style={{ background:"#FFF8F0", border:"2px solid #FF9500", borderRadius:12, padding:14, marginBottom:16 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#FF9500", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:8 }}>
+                      ⏳ {expiringSoon} essai{expiringSoon>1?"s":""} expirent dans les 7 prochains jours
+                    </div>
+                    {subs.filter(s => {
+                      if (s.status !== "trial") return false;
+                      const end = new Date(s.trial_ends_at);
+                      const diff = (end - now) / (1000*60*60*24);
+                      return diff >= 0 && diff <= 7;
+                    }).map(s => {
+                      const p = profiles.find(p => p.id === s.user_id);
+                      const daysLeft = Math.ceil((new Date(s.trial_ends_at) - now) / (1000*60*60*24));
+                      return (
+                        <div key={s.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #FFE0B0" }}>
+                          <span style={{ fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>
+                            {p?.full_name || p?.email || "—"}
+                          </span>
+                          <span style={{ fontSize:11, fontWeight:700, color: daysLeft<=1?"#FF2D2D":"#FF9500", fontFamily:"'Helvetica Neue',sans-serif" }}>
+                            J-{daysLeft}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* ── GÉNÉRER DES KEYS ── */}
           {tab === "keys" && (
