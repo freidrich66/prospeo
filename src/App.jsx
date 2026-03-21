@@ -2151,6 +2151,123 @@ function SuperAdminView({ profile, isMobile, notify }) {
   );
 }
 
+function ExpiredWall({ profile, subscription, isMobile, onActivate }) {
+  const [key, setKey]         = useState("");
+  const [loading, setLoading] = useState(false);
+  const [notify, setNotify]   = useState(null);
+
+  const showNotif = (msg, type="ok") => {
+    setNotify({ msg, type });
+    setTimeout(() => setNotify(null), 4000);
+  };
+
+  const subscribe = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/stripe-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: profile.email, userId: profile.id, quantity: 1 }),
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else showNotif("Erreur : " + data.error, "error");
+    } catch(err) { showNotif("Erreur : " + err.message, "error"); }
+    setLoading(false);
+  };
+
+  const activate = async () => {
+    if (!key.trim()) { showNotif("Entrez une clé d'activation", "error"); return; }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/activate-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: key.trim().toUpperCase(), userId: profile.id, email: profile.email }),
+      });
+      const data = await res.json();
+      if (data.success) { showNotif("✅ " + data.message); setTimeout(() => onActivate(), 1500); }
+      else showNotif(data.error || "Clé invalide", "error");
+    } catch(err) { showNotif("Erreur : " + err.message, "error"); }
+    setLoading(false);
+  };
+
+  const trialEnd = subscription?.trial_ends_at ? new Date(subscription.trial_ends_at) : null;
+  const isExpired = subscription?.status === "expired" || subscription?.status === "cancelled";
+
+  return (
+    <div style={{ minHeight:"100vh", background:"#1A1A1A", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+      {notify && (
+        <div style={{ position:"fixed", top:20, left:"50%", transform:"translateX(-50%)", background: notify.type==="error"?"#FF2D2D":"#00C48C", color:"#fff", padding:"12px 20px", borderRadius:10, fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", zIndex:9999, boxShadow:"0 4px 20px rgba(0,0,0,0.3)" }}>
+          {notify.msg}
+        </div>
+      )}
+      <div style={{ background:"#242424", borderRadius:20, padding:isMobile?24:40, maxWidth:480, width:"100%", textAlign:"center" }}>
+        {/* Logo */}
+        <div style={{ fontSize:44, color:"#FF4C1A", marginBottom:8 }}>◈</div>
+        <div style={{ fontSize:28, fontWeight:700, color:"#E8E0D4", fontFamily:"'Helvetica Neue',sans-serif", letterSpacing:2, marginBottom:8 }}>PROSPEO</div>
+
+        {/* Message */}
+        <div style={{ background:"#FF2D2D", borderRadius:10, padding:"12px 16px", marginBottom:24 }}>
+          <div style={{ fontSize:15, fontWeight:700, color:"#fff", fontFamily:"'Helvetica Neue',sans-serif" }}>
+            {isExpired ? "⏰ Période d'essai expirée" : "🔒 Accès suspendu"}
+          </div>
+          <div style={{ fontSize:12, color:"rgba(255,255,255,0.8)", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4 }}>
+            {trialEnd ? `Essai terminé le ${trialEnd.toLocaleDateString("fr-FR")}` : "Votre abonnement n'est plus actif"}
+          </div>
+        </div>
+
+        <p style={{ fontSize:14, color:"#CCCCCC", fontFamily:"'Helvetica Neue',sans-serif", lineHeight:1.6, margin:"0 0 28px" }}>
+          Vos données sont conservées. Abonnez-vous pour retrouver un accès complet à Prospeo.
+        </p>
+
+        {/* Prix */}
+        <div style={{ background:"#1A1A1A", borderRadius:12, padding:16, marginBottom:24 }}>
+          <div style={{ fontSize:36, fontWeight:700, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>4,99€ <span style={{ fontSize:16, color:"#888" }}>HT/mois</span></div>
+          <div style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4 }}>Facturé 59,88€ HT/an · Engagement 12 mois</div>
+        </div>
+
+        {/* Bouton paiement */}
+        <button style={{ width:"100%", padding:"14px", background:"#FF4C1A", color:"#fff", border:"none", borderRadius:10, cursor:"pointer", fontSize:15, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:700, marginBottom:16 }}
+          onClick={subscribe} disabled={loading}>
+          {loading ? "Redirection..." : "S'abonner maintenant →"}
+        </button>
+
+        {/* Séparateur */}
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+          <div style={{ flex:1, height:1, background:"#333" }} />
+          <span style={{ fontSize:12, color:"#555", fontFamily:"'Helvetica Neue',sans-serif" }}>ou</span>
+          <div style={{ flex:1, height:1, background:"#333" }} />
+        </div>
+
+        {/* Activer une clé */}
+        <div style={{ marginBottom:8 }}>
+          <div style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:8 }}>Vous avez une clé d'activation ?</div>
+          <div style={{ display:"flex", gap:8 }}>
+            <input
+              style={{ flex:1, padding:"10px 12px", border:"1.5px solid #333", borderRadius:8, background:"#1A1A1A", fontSize:13, fontFamily:"'Courier New',monospace", color:"#E8E0D4", outline:"none", textTransform:"uppercase", letterSpacing:1 }}
+              placeholder="PROS-XXXX-XXXX-XXXX"
+              value={key}
+              onChange={e=>setKey(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&activate()}
+            />
+            <button style={{ padding:"10px 14px", background:"#333", color:"#E8E0D4", border:"none", borderRadius:8, cursor:"pointer", fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
+              onClick={activate} disabled={loading}>
+              🔑
+            </button>
+          </div>
+        </div>
+
+        <div style={{ fontSize:11, color:"#555", fontFamily:"'Helvetica Neue',sans-serif", marginTop:16 }}>
+          Connecté en tant que {profile?.email}
+          <span style={{ margin:"0 8px" }}>·</span>
+          <span style={{ cursor:"pointer", color:"#888", textDecoration:"underline" }} onClick={()=>supabase.auth.signOut()}>Se déconnecter</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Loader() {
   return (
     <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh", background:"#F5F0E8" }}>
