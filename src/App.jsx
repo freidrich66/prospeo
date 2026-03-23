@@ -921,7 +921,7 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
               </p>
               <textarea
                 style={{ width:"100%", padding:"10px 12px", border:"1.5px solid #333", borderRadius:10, background:"#2A2A2A", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", color:"#E8E0D4", minHeight:70, resize:"none", boxSizing:"border-box", outline:"none" }}
-                placeholder=t("paste_or_type",lang)
+                placeholder={t("paste_or_type",lang)}
                 value={vocalText}
                 onChange={e=>setVocalText(e.target.value)}
               />
