@@ -651,7 +651,7 @@ function AddView({ profile, isMobile, notify, lang="fr", onAdded }) {
     const { data: newContact, error } = await supabase
       .from("contacts").insert({...form, user_id:profile.id}).select().single();
     if (error) { notify("Erreur enregistrement","error"); return; }
-    notify(`✅ ${form.first_name} ${form.last_name} ajouté !`);
+    notify(`✅ ${form.first_name} ${form.last_name} ${t("prospect_added",lang)}`);
 
     // Sync CRM automatique en arrière-plan
     if (newContact?.id) {
@@ -702,7 +702,7 @@ function AddView({ profile, isMobile, notify, lang="fr", onAdded }) {
       return;
     }
     const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
-    if (!SR) { notify("Vocal non supporté sur cet appareil","error"); return; }
+    if (!SR) { notify(t("vocal_not_supported",lang),"error"); return; }
     const r = new SR(); r.lang="fr-FR"; r.interimResults=false;
     r.onresult = e => { const t=e.results[0][0].transcript; f(field, form[field]?form[field]+" "+t:t); setRec(false); setRecF(null); notify(`🎙️ "${t}"`); };
     r.onerror = ()=>{ setRec(false); setRecF(null); notify("Erreur micro","error"); };
@@ -743,7 +743,7 @@ function AddView({ profile, isMobile, notify, lang="fr", onAdded }) {
 
   const startRecording = () => {
     const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
-    if (!SR) { notify("Vocal non supporté","error"); return; }
+    if (!SR) { notify(t("vocal_not_supported",lang),"error"); return; }
     const r = new SR(); r.lang="fr-FR"; r.interimResults=true; r.continuous=false;
     r.onresult = e => {
       const transcript = Array.from(e.results).map(res=>res[0].transcript).join(" ");
@@ -760,7 +760,7 @@ function AddView({ profile, isMobile, notify, lang="fr", onAdded }) {
   };
 
   const analyzeVocalText = async (text) => {
-    if (!text.trim()) { notify("Aucun texte à analyser","error"); return; }
+    if (!text.trim()) { notify(t("no_text_analyze",lang),"error"); return; }
     setVocalAnalyzing(true);
     try {
       const result = await callClaude([{
@@ -829,18 +829,18 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
           <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:12 }}>
             <div style={{ display:"flex", alignItems:"center", gap:8 }}>
               <span style={{ fontSize:20 }}>🎙️</span>
-              <span style={{ fontSize:14, fontWeight:600, color:"#E8E0D4", fontFamily:"'Helvetica Neue',sans-serif" }}>Vocal non disponible</span>
+              <span style={{ fontSize:14, fontWeight:600, color:"#E8E0D4", fontFamily:"'Helvetica Neue',sans-serif" }}>{t("vocal_unavailable",lang)}</span>
             </div>
             <button style={{ border:"none", background:"transparent", color:"#888", cursor:"pointer", fontSize:18, padding:"0 0 0 8px" }} onClick={()=>setShowPWABanner(false)}>✕</button>
           </div>
           <p style={{ fontSize:13, color:"#CCCCCC", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 16px", lineHeight:1.6 }}>
-            La dictée vocale n'est pas disponible depuis l'app raccourci iPhone. Elle fonctionne uniquement dans <strong style={{ color:"#E8E0D4" }}>Google Chrome</strong>.
+            {t("vocal_pwa_msg",lang)} <strong style={{ color:"#E8E0D4" }}>Google Chrome</strong>.
           </p>
           <button
             style={{ width:"100%", padding:"13px", background:"#FF4C1A", color:"#fff", border:"none", borderRadius:10, cursor:"pointer", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}
             onClick={openInChrome}>
             <span>🌐</span>
-            <span>Ouvrir dans Chrome</span>
+            <span>{t("open_in_chrome",lang)}</span>
           </button>
           <p style={{ fontSize:11, color:"#AAAAAA", fontFamily:"'Helvetica Neue',sans-serif", margin:"10px 0 0", textAlign:"center", lineHeight:1.5 }}>
             Si Chrome n'est pas installé, téléchargez-le depuis l'App Store
@@ -861,7 +861,7 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
         ))}
       </div>
       <input ref={fileRef} type="file" accept="image/*" style={{ display:"none" }} onChange={scanCard} />
-      {analyzing && <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 18px", background:"#FFF8F4", border:"2px solid #FF4C1A", borderRadius:10, marginBottom:18, fontFamily:"'Helvetica Neue',sans-serif", fontSize:13, color:"#FF4C1A" }}><div style={{ width:16, height:16, border:"3px solid #FFD4C4", borderTopColor:"#FF4C1A", borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /><span>Analyse IA...</span></div>}
+      {analyzing && <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 18px", background:"#FFF8F4", border:"2px solid #FF4C1A", borderRadius:10, marginBottom:18, fontFamily:"'Helvetica Neue',sans-serif", fontSize:13, color:"#FF4C1A" }}><div style={{ width:16, height:16, border:"3px solid #FFD4C4", borderTopColor:"#FF4C1A", borderRadius:"50%", animation:"spin 0.8s linear infinite" }} /><span>{t("analyzing",lang)}</span></div>}
 
       {duplicate && (
         <div style={{ background: duplicate.isOwn ? "#FFF8F4" : "#FFF3F3", border:`2px solid ${duplicate.isOwn?"#FF9500":"#FF2D2D"}`, borderRadius:12, padding:16, marginBottom:16 }}>
@@ -869,13 +869,13 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
             <span style={{ fontSize:20, flexShrink:0 }}>{duplicate.isOwn ? "⚠️" : "🚫"}</span>
             <div style={{ flex:1 }}>
               <div style={{ fontSize:14, fontWeight:700, color: duplicate.isOwn?"#FF9500":"#FF2D2D", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:4 }}>
-                {duplicate.isOwn ? "Prospect déjà dans votre base" : "Prospect déjà enregistré"}
+                {duplicate.isOwn ? t("duplicate_own",lang) : t("duplicate_other",lang)}
               </div>
               <div style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif", lineHeight:1.5 }}>
                 <strong>{duplicate.contact.first_name} {duplicate.contact.last_name}</strong>
                 {duplicate.contact.company ? ` · ${duplicate.contact.company}` : ""}
                 {" "}est déjà dans la base, affilié à{" "}
-                <strong>{duplicate.isOwn ? "vous-même" : `${duplicate.ownerRole} ${duplicate.ownerName}`}</strong>.
+                <strong>{duplicate.isOwn ? t("yourself",lang) : `${duplicate.ownerRole} ${duplicate.ownerName}`}</strong>.
               </div>
               {duplicate.contact.status && (
                 <div style={{ marginTop:6, display:"flex", alignItems:"center", gap:6 }}>
@@ -905,7 +905,7 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
             <div style={{ display:"flex", alignItems:"center", gap:8 }}>
               <div style={{ width:10, height:10, borderRadius:"50%", background: vocalRecRef.current ? "#FF4C1A" : "#555", animation: vocalRecRef.current ? "pulse 1s infinite" : "none" }} />
               <span style={{ fontSize:13, fontWeight:600, color:"#FFFFFF", fontFamily:"'Helvetica Neue',sans-serif" }}>
-                {isIOSSafari() ? "Dictée vocale" : vocalRecRef.current ? "Écoute en cours..." : "Prêt à écouter"}
+                {isIOSSafari() ? "Dictée vocale" : vocalRecRef.current ? t("listening",lang) : t("ready_to_listen",lang)}
               </span>
             </div>
             <button style={{ border:"none", background:"transparent", color:"#888", cursor:"pointer", fontSize:18, padding:"4px" }} onClick={()=>{ stopVocalFull(); setVocalFull(false); setVocalText(""); f("source","manuel"); }}>✕</button>
@@ -921,7 +921,7 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
               </p>
               <textarea
                 style={{ width:"100%", padding:"10px 12px", border:"1.5px solid #333", borderRadius:10, background:"#2A2A2A", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", color:"#E8E0D4", minHeight:70, resize:"none", boxSizing:"border-box", outline:"none" }}
-                placeholder="Collez ou tapez ici le texte dicté..."
+                placeholder=t("paste_or_type",lang)
                 value={vocalText}
                 onChange={e=>setVocalText(e.target.value)}
               />
@@ -977,7 +977,7 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
       <div style={{ marginBottom:14 }}>
         <label style={L}>{t("notes",lang)}</label>
         <div style={{ display:"flex", gap:8 }}>
-          <textarea style={{ ...I, minHeight:85, resize:"vertical" }} placeholder="..." value={form.notes} onChange={e=>f("notes",e.target.value)} />
+          <textarea style={{ ...I, minHeight:85, resize:"vertical" }} placeholder={t("paste_or_type",lang)} value={form.notes} onChange={e=>f("notes",e.target.value)} />
           <button style={{ width:43, height:43, border:`2px solid ${rec&&recF==="notes"?"#FF4C1A":"#E8E0D4"}`, borderRadius:8, background:rec&&recF==="notes"?"#FF4C1A":"#fff", cursor:"pointer", fontSize:15, flexShrink:0, alignSelf:"flex-start" }}
             onClick={()=>rec&&recF==="notes"?stopVoice():startVoice("notes")}>
             🎙️
@@ -1132,7 +1132,7 @@ function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBa
           </div>
           <div style={{ marginBottom:14 }}>
             <label style={L}>{t("notes",lang)}</label>
-            <textarea style={{ ...I, minHeight:80, resize:"vertical" }} placeholder="..." value={editForm.notes} onChange={e=>ef("notes",e.target.value)} />
+            <textarea style={{ ...I, minHeight:80, resize:"vertical" }} placeholder={t("paste_or_type",lang)} value={editForm.notes} onChange={e=>ef("notes",e.target.value)} />
           </div>
           <div style={{ display:"flex", gap:10 }}>
             <button style={{ ...BS, flex:1 }} onClick={()=>setEditing(false)}>Annuler</button>
