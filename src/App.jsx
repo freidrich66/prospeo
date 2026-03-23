@@ -79,7 +79,7 @@ function isSuperManager(profile) {
 }
 
 function displayName(p) {
-  if (!p) return t("error",lang);
+  if (!p) return "Inconnu";
   if (p.first_name && p.last_name) return `${p.first_name} ${p.last_name}`;
   if (p.full_name) return p.full_name;
   if (p.email) return p.email;
@@ -212,7 +212,7 @@ function AuthPage({ lang="fr", changeLang }) {
         <div style={{ marginBottom:14 }}><label style={L}>{t("email",lang)}</label><input style={I} type="email" placeholder="jean@entreprise.fr" value={email} onChange={e=>setEmail(e.target.value)} /></div>
         <div style={{ marginBottom:14 }}><label style={L}>Mot de passe</label><input style={I} type="password" placeholder="••••••••" value={password} onChange={e=>setPwd(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} /></div>
         {error && <div style={{ padding:"10px 14px", borderRadius:8, background:error.startsWith("✅")?"#EBF8F4":"#FFF0F0", color:error.startsWith("✅")?"#00875A":"#FF2D2D", fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", marginBottom:14 }}>{error}</div>}
-        <button style={{ width:"100%", padding:"14px", background:"#1A1A1A", color:"#E8E0D4", border:"none", borderRadius:10, cursor:"pointer", fontSize:15, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }} onClick={submit} disabled={busy}>{busy?t("loading",lang):mode==="login"?t("login",lang):t("register",lang)}</button>
+        <button style={{ width:"100%", padding:"14px", background:"#1A1A1A", color:"#E8E0D4", border:"none", borderRadius:10, cursor:"pointer", fontSize:15, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }} onClick={submit} disabled={busy}>{busy?"Chargement...":mode==="login"?t("login",lang):t("register",lang)}</button>
         <button style={{ display:"block", marginTop:14, border:"none", background:"none", color:"#888", cursor:"pointer", fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", width:"100%", textAlign:"center", padding:"8px" }} onClick={()=>{setMode(mode==="login"?"register":"login");setError("");}}>
           {mode==="login"?"Pas encore de compte ? S'inscrire":"Déjà un compte ? Se connecter"}
         </button>
@@ -807,7 +807,7 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
       }
     } catch(err) {
       console.error("Erreur analyse vocale:", err.message);
-      notify(t("error",lang) + ": " + err.message, "error");
+      notify("Erreur : " + err.message, "error");
     }
     setVocalAnalyzing(false);
   };
@@ -1135,7 +1135,7 @@ function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBa
             <textarea style={{ ...I, minHeight:80, resize:"vertical" }} placeholder={t("paste_or_type",lang)} value={editForm.notes} onChange={e=>ef("notes",e.target.value)} />
           </div>
           <div style={{ display:"flex", gap:10 }}>
-            <button style={{ ...BS, flex:1 }} onClick={()=>setEditing(false)}>{t("cancel",lang)}</button>
+            <button style={{ ...BS, flex:1 }} onClick={()=>setEditing(false)}>Annuler</button>
             <button style={{ ...BP, flex:1 }} onClick={saveEdit} disabled={saving}>
               {saving ? t("saving",lang) : t("save",lang)}
             </button>
@@ -1228,7 +1228,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
     );
     return matchPeriod && matchUser && matchSearch;
   });
-  const allUsers = profile?.role==="manager" ? [...new Set(contacts.map(c=>c.profiles?.full_name||c.profiles?.email||t("error",lang)))] : [];
+  const allUsers = profile?.role==="manager" ? [...new Set(contacts.map(c=>c.profiles?.full_name||c.profiles?.email||"Inconnu"))] : [];
 
   const stats = {
     total:    filtered.length,
@@ -1352,7 +1352,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
             <input style={{ ...I, marginBottom:10 }} placeholder="Objet" defaultValue={`Rapport — ${getPeriods(lang).find(p=>p.id===period)?.label}`} />
             <textarea style={{ ...I, minHeight:70, marginBottom:14 }} defaultValue={`Total : ${stats.total} | Chauds : ${stats.chaud} | Convertis : ${stats.converti}`} />
             <div style={{ display:"flex", gap:10 }}>
-              <button style={{ ...BS, flex:1 }} onClick={()=>setPreview(false)}>{t("cancel",lang)}</button>
+              <button style={{ ...BS, flex:1 }} onClick={()=>setPreview(false)}>Annuler</button>
               <button style={{ ...BP, flex:1 }} onClick={async()=>{ setSending(true); await new Promise(r=>setTimeout(r,1500)); setSending(false); notify("📧 Envoyé !"); setPreview(false); }} disabled={sending}>{sending?t("loading",lang):"✉️ Envoyer"}</button>
             </div>
           </div>
@@ -1470,12 +1470,12 @@ function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, onUpdat
       .eq("id", profile.id)
       .select()
       .single();
-    if (error) { notify(t("error",lang),"error"); }
+    if (error) { notify("Erreur sauvegarde","error"); }
     else { notify(t("profile_updated",lang)); onUpdated({ ...profile, ...data }); }
     setSaving(false);
   };
 
-  if (loading) return <div style={{ ...P(isMobile), textAlign:"center", paddingTop:60 }}><div style={{ fontSize:32, color:"#FF4C1A", marginBottom:10 }}>◈</div><div style={{ fontFamily:"'Helvetica Neue',sans-serif", color:"#888" }}>{t("loading",lang)}</div></div>;
+  if (loading) return <div style={{ ...P(isMobile), textAlign:"center", paddingTop:60 }}><div style={{ fontSize:32, color:"#FF4C1A", marginBottom:10 }}>◈</div><div style={{ fontFamily:"'Helvetica Neue',sans-serif", color:"#888" }}>Chargement...</div></div>;
 
   return (
     <div style={P(isMobile)}>
@@ -1567,8 +1567,8 @@ function SubscriptionView({ profile, subscription, isMobile, lang="fr", notify, 
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
-      else notify(t("error",lang) + " Stripe: " + data.error, "error");
-    } catch (err) { notify(t("error",lang) + ": " + err.message, "error"); }
+      else notify("Erreur Stripe : " + data.error, "error");
+    } catch (err) { notify("Erreur : " + err.message, "error"); }
     setLoading(false);
   };
 
@@ -1578,13 +1578,13 @@ function SubscriptionView({ profile, subscription, isMobile, lang="fr", notify, 
   const daysLeft = trialEnd ? Math.max(0, Math.ceil((trialEnd - now) / 86400000)) : 0;
 
   const statusLabel = () => {
-    if (!subscription) return { text:t("loading",lang), color:"#888" };
+    if (!subscription) return { text:"Chargement...", color:"#888" };
     if (subscription.status==="lifetime" || (subEnd && subEnd > new Date("2099-01-01"))) return { text:"♾️ Licence gratuite à vie", color:"#FF4C1A" };
     if (subscription.status==="active")    return { text:`✅ Actif — expire le ${subEnd?.toLocaleDateString("fr-FR")}`, color:"#00C48C" };
     if (subscription.status==="trial")     return { text:`🎁 ${t("trial_active",lang)} — ${daysLeft} jour${daysLeft>1?"s":""} restant${daysLeft>1?"s":""}`, color:"#1A6AFF" };
     if (subscription.status==="expired")   return { text:"❌ Expiré", color:"#FF2D2D" };
     if (subscription.status==="cancelled") return { text:"Annulé", color:"#888" };
-    return { text:t("error",lang), color:"#888" };
+    return { text:"Inconnu", color:"#888" };
   };
   const sl = statusLabel();
 
@@ -1621,7 +1621,7 @@ function SubscriptionView({ profile, subscription, isMobile, lang="fr", notify, 
               ))}
             </div>
             <button style={{ ...BP, width:"100%", padding:"14px", background:"#FF4C1A", fontSize:15 }} onClick={()=>subscribe("annual")} disabled={loading}>
-              {loading ? t("loading",lang) : t("subscribe",lang) + " — 59,88€ HT/an →"}
+              {loading ? t("loading",lang) : "S'abonner — 59,88€ HT / an →"}
             </button>
             <div style={{ fontSize:11, color:"#AAAAAA", fontFamily:"'Helvetica Neue',sans-serif", textAlign:"center", marginTop:10 }}>
               {t("free_trial_days",lang)} · Sans carte bancaire requise
@@ -1661,8 +1661,8 @@ function SubscriptionView({ profile, subscription, isMobile, lang="fr", notify, 
                 });
                 const data = await res.json();
                 if (data.url) window.location.href = data.url;
-                else notify(t("error",lang) + ": "+data.error,"error");
-              } catch(err){ notify(t("error",lang) + ": "+err.message,"error"); }
+                else notify("Erreur : "+data.error,"error");
+              } catch(err){ notify("Erreur : "+err.message,"error"); }
               setAddingMore(false);
             }}>
               {addingMore ? t("loading",lang) : `Acheter ${addQtyMore} licence${addQtyMore>1?"s":""} →`}
@@ -1704,13 +1704,13 @@ function ActivateKeyView({ profile, isMobile, lang="fr", notify, onActivated, in
       } else {
         notify(data.error || t("error",lang),"error");
       }
-    } catch (err) { notify(t("error",lang) + ": " + err.message,"error"); }
+    } catch (err) { notify("Erreur : " + err.message,"error"); }
     setLoading(false);
   };
 
   return (
     <div style={inline ? { marginTop:16 } : P(isMobile)}>
-      {!inline && <h1 style={T(isMobile)}>{t("activate_btn",lang)}</h1>}
+      {!inline && <h1 style={T(isMobile)}>Activer ma clé</h1>}
       <div style={{ marginTop:inline?0:20 }}>
         <label style={L}>{t("activate_key",lang)}</label>
         <input style={{ ...I, textTransform:"uppercase", letterSpacing:2, fontFamily:"'Courier New',monospace", marginBottom:12 }}
@@ -1740,18 +1740,18 @@ function CRMLockedView({ isMobile, lang="fr" }) {
           L'intégration CRM est une option payante disponible sur devis. Elle permet de synchroniser automatiquement vos prospects avec HubSpot, Salesforce, Pipedrive, Zoho et Odoo.
         </p>
         <div style={{ background:"#F5F0E8", borderRadius:12, padding:20, marginBottom:24, display:"inline-block", textAlign:"left", minWidth:280 }}>
-          <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:1, marginBottom:12, fontWeight:600 }}>{t("sub_title",lang)}</div>
+          <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:1, marginBottom:12, fontWeight:600 }}>Tarification</div>
           <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
-            <span style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>Prospeo</span>
+            <span style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>Licence de base</span>
             <span style={{ fontSize:13, fontWeight:700, color:"#1A1A1A" }}>4,99€ HT/mois</span>
           </div>
           <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
-            <span style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>{t("crm_title",lang)}</span>
+            <span style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>Option CRM</span>
             <span style={{ fontSize:13, fontWeight:700, color:"#FF4C1A" }}>+ 1,99€ HT/mois/licence</span>
           </div>
           <div style={{ borderTop:"1px solid #E8E0D4", marginTop:8, paddingTop:8, display:"flex", justifyContent:"space-between" }}>
-            <span style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>{t("crm_title",lang)}</span>
-            <span style={{ fontSize:13, fontWeight:700, color:"#888" }}>On quote</span>
+            <span style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>Frais de paramétrage</span>
+            <span style={{ fontSize:13, fontWeight:700, color:"#888" }}>Sur devis</span>
           </div>
         </div>
         <p style={{ fontSize:12, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 20px" }}>
@@ -1780,7 +1780,7 @@ function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
             L'intégration CRM est une option payante disponible sur demande. Elle permet de synchroniser automatiquement vos prospects avec HubSpot, Salesforce, Pipedrive, Zoho et Odoo.
           </p>
           <div style={{ background:"#F5F0E8", borderRadius:12, padding:20, marginBottom:24, display:"inline-block", textAlign:"left" }}>
-            <div style={{ fontSize:13, fontWeight:700, color:"#1A1A1A", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:10 }}>{t("sub_title",lang)}</div>
+            <div style={{ fontSize:13, fontWeight:700, color:"#1A1A1A", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:10 }}>Tarification</div>
             <div style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:6 }}>
               ➕ <strong>+1,99€ HT/mois/licence</strong> en supplément du forfait de base
             </div>
@@ -1827,7 +1827,7 @@ function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
   const selectedCRM = CRM_TYPES.find(c => c.id === form.crm_type);
 
   const save = async () => {
-    if (!form.name) { notify("...","error"); return; }
+    if (!form.name) { notify("Donnez un nom à cette configuration","error"); return; }
     setSaving(true);
     const { error } = await supabase.from("crm_configs").insert({
       user_id: profile.id,
@@ -1836,7 +1836,7 @@ function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
       active: true,
       config: form.config,
     });
-    if (error) notify(t("error",lang),"error");
+    if (error) notify("Erreur sauvegarde","error");
     else { notify("✅ CRM configuré !"); setShowForm(false); loadConfigs(); }
     setSaving(false);
   };
@@ -1868,12 +1868,12 @@ function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
       </div>
 
       {/* Configs existantes */}
-      {loading ? <div style={LT}>{t("loading",lang)}</div> : (
+      {loading ? <div style={LT}>Chargement...</div> : (
         <>
           {configs.length === 0 && !showForm && (
             <div style={{ ...C, textAlign:"center", padding:32, marginBottom:16 }}>
               <div style={{ fontSize:32, marginBottom:10 }}>🔗</div>
-              <div style={{ fontFamily:"'Helvetica Neue',sans-serif", color:"#888", marginBottom:16 }}>{t("crm_connect",lang)}</div>
+              <div style={{ fontFamily:"'Helvetica Neue',sans-serif", color:"#888", marginBottom:16 }}>Aucun CRM configuré</div>
               <button style={BP} onClick={()=>setShowForm(true)}>+ Connecter un CRM</button>
             </div>
           )}
@@ -1955,7 +1955,7 @@ function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
           )}
 
           <div style={{ display:"flex", gap:10, marginTop:16 }}>
-            <button style={{ ...BS, flex:1 }} onClick={()=>setShowForm(false)}>{t("cancel",lang)}</button>
+            <button style={{ ...BS, flex:1 }} onClick={()=>setShowForm(false)}>Annuler</button>
             <button style={{ ...BP, flex:1 }} onClick={save} disabled={saving}>
               {saving?t("saving",lang):"✅ " + t("crm_connect",lang)}
             </button>
@@ -2110,7 +2110,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
         <p style={Sub}>Tableau de bord de gestion — accès exclusif</p>
       </div>
 
-      {loading ? <div style={LT}>{t("loading",lang)}</div> : (
+      {loading ? <div style={LT}>Chargement...</div> : (
         <>
           {/* Stats */}
           <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)", gap:10, marginBottom:20 }}>
@@ -2615,8 +2615,8 @@ function ExpiredWall({ profile, subscription, isMobile, onActivate }) {
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
-      else showNotif(t("error",lang) + ": " + data.error, "error");
-    } catch(err) { showNotif(t("error",lang) + ": " + err.message, "error"); }
+      else showNotif("Erreur : " + data.error, "error");
+    } catch(err) { showNotif("Erreur : " + err.message, "error"); }
     setLoading(false);
   };
 
@@ -2632,7 +2632,7 @@ function ExpiredWall({ profile, subscription, isMobile, onActivate }) {
       const data = await res.json();
       if (data.success) { showNotif("✅ " + data.message); setTimeout(() => onActivate(), 1500); }
       else showNotif(data.error || t("error",lang), "error");
-    } catch(err) { showNotif(t("error",lang) + ": " + err.message, "error"); }
+    } catch(err) { showNotif("Erreur : " + err.message, "error"); }
     setLoading(false);
   };
 
@@ -2717,7 +2717,7 @@ function Loader() {
     <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh", background:"#F5F0E8" }}>
       <div style={{ textAlign:"center" }}>
         <div style={{ fontSize:38, color:"#FF4C1A", marginBottom:10 }}>◈</div>
-        <div style={{ fontFamily:"'Helvetica Neue',sans-serif", color:"#888", fontSize:13 }}>{t("loading",lang)}</div>
+        <div style={{ fontFamily:"'Helvetica Neue',sans-serif", color:"#888", fontSize:13 }}>Chargement...</div>
       </div>
     </div>
   );
