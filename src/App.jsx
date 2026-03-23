@@ -79,7 +79,7 @@ function isSuperManager(profile) {
 }
 
 function displayName(p) {
-  if (!p) return t("error",lang);
+  if (!p) return "—";
   if (p.first_name && p.last_name) return `${p.first_name} ${p.last_name}`;
   if (p.full_name) return p.full_name;
   if (p.email) return p.email;
@@ -293,6 +293,13 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
   ];
 
   const go = (id) => setView(id);
+
+  // ── Blocage si expiré (sauf Super Manager) ──
+  if (!isSuperManager(profile) && subscription &&
+      subscription.status === "expired" &&
+      !(subscription.current_period_end && new Date(subscription.current_period_end) > new Date("2099-01-01"))) {
+    return <ExpiredWall profile={profile} subscription={subscription} isMobile={isMobile} lang={lang} onActivate={loadSubscription} />;
+  }
 
   return (
     <div style={{ display:"flex", minHeight:"100vh", background:"#F5F0E8", fontFamily:"Georgia,serif" }}>
@@ -2595,7 +2602,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
   );
 }
 
-function ExpiredWall({ profile, subscription, isMobile, onActivate }) {
+function ExpiredWall({ profile, subscription, isMobile, lang="fr", onActivate }) {
   const [key, setKey]         = useState("");
   const [loading, setLoading] = useState(false);
   const [notify, setNotify]   = useState(null);
@@ -2717,7 +2724,7 @@ function Loader() {
     <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh", background:"#F5F0E8" }}>
       <div style={{ textAlign:"center" }}>
         <div style={{ fontSize:38, color:"#FF4C1A", marginBottom:10 }}>◈</div>
-        <div style={{ fontFamily:"'Helvetica Neue',sans-serif", color:"#888", fontSize:13 }}>{t("loading",lang)}</div>
+        <div style={{ fontFamily:"'Helvetica Neue',sans-serif", color:"#888", fontSize:13 }}>Chargement...</div>
       </div>
     </div>
   );
