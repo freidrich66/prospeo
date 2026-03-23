@@ -13,6 +13,35 @@ const getStatusColors = (lang="fr") => Object.fromEntries(
 );
 const STATUS_COLORS = getStatusColors("fr");
 const SOURCE_ICONS = { carte: "📇", manuel: "✏️", vocal: "🎙️" };
+
+const CONTACT_TYPES = [
+  { id:"note",     icon:"📝", key:"note"     },
+  { id:"physical", icon:"🤝", key:"physical" },
+  { id:"phone",    icon:"📞", key:"phone"    },
+  { id:"email",    icon:"✉️", key:"email"    },
+];
+
+const PROGRESS_STAGES = [
+  { value:10,  label_fr:"Projet détecté",    label_en:"Project detected",    color:"#E8E0D4" },
+  { value:20,  label_fr:"Projet analysé",    label_en:"Project analyzed",    color:"#FFD4C4" },
+  { value:40,  label_fr:"Projet reformulé",  label_en:"Project reformulated",color:"#FF9500" },
+  { value:50,  label_fr:"Cotation",          label_en:"Quotation",           color:"#FF7A00" },
+  { value:70,  label_fr:"Négociation",       label_en:"Negotiation",         color:"#FF4C1A" },
+  { value:80,  label_fr:"Accord de principe",label_en:"Principle agreement", color:"#1A6AFF" },
+  { value:100, label_fr:"Projet gagné",      label_en:"Project won",         color:"#00C48C" },
+];
+
+const CURRENCIES = [
+  { code:"EUR", symbol:"€" },
+  { code:"USD", symbol:"$" },
+  { code:"CNY", symbol:"¥" },
+];
+
+function getProgressStage(lang, value) {
+  const s = PROGRESS_STAGES.find(p => p.value === value);
+  if (!s) return null;
+  return lang === "fr" ? s.label_fr : s.label_en;
+}
 const getPeriods = (lang="fr") => [
   { id: "today",     label: t("today",lang)          },
   { id: "yesterday", label: t("yesterday",lang)       },
@@ -1154,9 +1183,76 @@ function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBa
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving]    = useState(false);
 
+  // ── Projects ──
+  const [projects, setProjects]   = useState([]);
+  const [showProjForm, setShowProjForm] = useState(false);
+  const [projForm, setProjForm]   = useState({ name:"", parent_id:"", amount:"", currency:"EUR", progress:10, estimated_end:"" });
+  const [savingProj, setSavingProj] = useState(false);
+  const pf = (k,v) => setProjForm(p=>({...p,[k]:v}));
+
+  // ── Notes enrichies ──
+  const [notes, setNotes]         = useState([]);
+  const [showNoteForm, setShowNoteForm] = useState(false);
+  const [noteForm, setNoteForm]   = useState({ content:"", contact_type:"note", contact_status:"", followup_date:"", amount:"", currency:"EUR", progress:null, project_id:"" });
+  const [savingNote, setSavingNote] = useState(false);
+  const nf = (k,v) => setNoteForm(p=>({...p,[k]:v}));
+
+  // ── Load data ──
   useEffect(() => {
     supabase.from("syntheses").select("*").eq("contact_id",c.id).order("created_at",{ascending:false}).then(({data})=>setPast(data||[]));
+    supabase.from("projects").select("*").eq("contact_id",c.id).order("created_at",{ascending:false}).then(({data})=>setProjects(data||[]));
+    supabase.from("contact_notes").select("*").eq("contact_id",c.id).order("created_at",{ascending:false}).then(({data})=>setNotes(data||[]));
   }, [c.id]);
+
+  // ── Save project ──
+  const saveProject = async () => {
+    if (!projForm.name.trim()) { notify(t("error",lang),"error"); return; }
+    setSavingProj(true);
+    const payload = {
+      contact_id: c.id,
+      user_id: profile.id,
+      name: projForm.name,
+      parent_id: projForm.parent_id || null,
+      amount: projForm.amount ? parseFloat(projForm.amount) : null,
+      currency: projForm.currency,
+      progress: parseInt(projForm.progress),
+      progress_label: getProgressStage(lang, parseInt(projForm.progress)),
+      estimated_end: projForm.estimated_end || null,
+    };
+    const { data, error } = await supabase.from("projects").insert(payload).select().single();
+    if (error) notify(t("error",lang),"error");
+    else { setProjects(p=>[data,...p]); setShowProjForm(false); setProjForm({ name:"", parent_id:"", amount:"", currency:"EUR", progress:10, estimated_end:"" }); notify("✅ Projet ajouté !"); }
+    setSavingProj(false);
+  };
+
+  // ── Save note ──
+  const saveNote = async () => {
+    if (!noteForm.content.trim()) { notify(t("error",lang),"error"); return; }
+    setSavingNote(true);
+    const payload = {
+      contact_id: c.id,
+      user_id: profile.id,
+      content: noteForm.content,
+      contact_type: noteForm.contact_type,
+      contact_status: noteForm.contact_status || null,
+      followup_date: noteForm.followup_date || null,
+      amount: noteForm.amount ? parseFloat(noteForm.amount) : null,
+      currency: noteForm.currency,
+      progress: noteForm.progress ? parseInt(noteForm.progress) : null,
+      project_id: noteForm.project_id || null,
+    };
+    const { data, error } = await supabase.from("contact_notes").insert(payload).select().single();
+    if (error) notify(t("error",lang),"error");
+    else { setNotes(p=>[data,...p]); setShowNoteForm(false); setNoteForm({ content:"", contact_type:"note", contact_status:"", followup_date:"", amount:"", currency:"EUR", progress:null, project_id:"" }); notify("✅ Note ajoutée !"); }
+    setSavingNote(false);
+  };
+
+  // ── Delete note ──
+  const deleteNote = async (id) => {
+    if (!confirm("Supprimer cette note ?")) return;
+    await supabase.from("contact_notes").delete().eq("id",id);
+    setNotes(p=>p.filter(n=>n.id!==id));
+  };
 
   const ef = (k,v) => setEditForm(p=>({...p,[k]:v}));
 
@@ -1276,6 +1372,238 @@ function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBa
       </div>
 
       {c.notes && <div style={{ ...C, marginBottom:14 }}><h3 style={CT}>{t("notes",lang)}</h3><p style={{ fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", color:"#444", lineHeight:1.6, margin:0 }}>{c.notes}</p></div>}
+
+      {/* ── PROJETS ── */}
+      <div style={{ ...C, marginBottom:14 }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+          <h3 style={CT}>📁 Projets ({projects.length})</h3>
+          <button style={{ padding:"6px 12px", background:"#1A1A1A", color:"#E8E0D4", border:"none", borderRadius:8, cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
+            onClick={()=>setShowProjForm(!showProjForm)}>+ Projet</button>
+        </div>
+
+        {showProjForm && (
+          <div style={{ background:"#F5F0E8", borderRadius:10, padding:14, marginBottom:14 }}>
+            <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:10, marginBottom:10 }}>
+              <div>
+                <label style={L}>Nom du projet *</label>
+                <input style={I} placeholder="Ex: Chantier Lyon" value={projForm.name} onChange={e=>pf("name",e.target.value)} />
+              </div>
+              <div>
+                <label style={L}>Sous-projet de</label>
+                <select style={{ ...I, cursor:"pointer" }} value={projForm.parent_id} onChange={e=>pf("parent_id",e.target.value)}>
+                  <option value="">— Projet principal —</option>
+                  {projects.filter(p=>!p.parent_id).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={L}>Avancement</label>
+                <select style={{ ...I, cursor:"pointer" }} value={projForm.progress} onChange={e=>pf("progress",e.target.value)}>
+                  {PROGRESS_STAGES.map(s=>(
+                    <option key={s.value} value={s.value}>{s.value}% — {lang==="fr"?s.label_fr:s.label_en}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={L}>Date fin estimée</label>
+                <input style={I} type="date" value={projForm.estimated_end} onChange={e=>pf("estimated_end",e.target.value)} />
+              </div>
+              <div>
+                <label style={L}>Montant</label>
+                <div style={{ display:"flex", gap:6 }}>
+                  <input style={{ ...I, flex:1 }} type="number" min="0" placeholder="0" value={projForm.amount} onChange={e=>pf("amount",e.target.value)} />
+                  <select style={{ ...I, width:70, padding:"11px 8px", cursor:"pointer" }} value={projForm.currency} onChange={e=>pf("currency",e.target.value)}>
+                    {CURRENCIES.map(c=><option key={c.code} value={c.code}>{c.symbol}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:8 }}>
+              <button style={{ ...BS, flex:1 }} onClick={()=>setShowProjForm(false)}>{t("cancel",lang)}</button>
+              <button style={{ ...BP, flex:1 }} onClick={saveProject} disabled={savingProj}>{savingProj?"...":"✅ Créer le projet"}</button>
+            </div>
+          </div>
+        )}
+
+        {projects.length === 0 && !showProjForm && (
+          <div style={{ fontSize:13, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", textAlign:"center", padding:"10px 0" }}>Aucun projet</div>
+        )}
+
+        {projects.filter(p=>!p.parent_id).map(proj => {
+          const subprojects = projects.filter(sp=>sp.parent_id===proj.id);
+          const stage = PROGRESS_STAGES.find(s=>s.value===proj.progress);
+          return (
+            <div key={proj.id} style={{ border:`2px solid ${stage?.color||"#E8E0D4"}`, borderRadius:10, padding:12, marginBottom:8 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
+                <div>
+                  <div style={{ fontSize:14, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>📁 {proj.name}</div>
+                  {proj.estimated_end && <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>📅 Fin estimée : {new Date(proj.estimated_end).toLocaleDateString()}</div>}
+                </div>
+                <div style={{ textAlign:"right" }}>
+                  {proj.amount && <div style={{ fontSize:13, fontWeight:700, color:"#1A1A1A" }}>{proj.amount.toLocaleString()} {CURRENCIES.find(c=>c.code===proj.currency)?.symbol}</div>}
+                  <div style={{ fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:12, background:stage?.color||"#E8E0D4", color:stage?.value>=50?"#fff":"#444", fontFamily:"'Helvetica Neue',sans-serif", marginTop:2, display:"inline-block" }}>
+                    {proj.progress}% — {lang==="fr"?stage?.label_fr:stage?.label_en}
+                  </div>
+                </div>
+              </div>
+              {/* Progress bar */}
+              <div style={{ height:6, background:"#F0EBE0", borderRadius:3, overflow:"hidden", marginBottom:6 }}>
+                <div style={{ height:"100%", width:`${proj.progress}%`, background:stage?.color, borderRadius:3, transition:"width 0.5s" }} />
+              </div>
+              {/* Subprojects */}
+              {subprojects.map(sp=>{
+                const spStage = PROGRESS_STAGES.find(s=>s.value===sp.progress);
+                return (
+                  <div key={sp.id} style={{ marginLeft:12, marginTop:6, padding:"8px 10px", background:"#F5F0E8", borderRadius:8, borderLeft:`3px solid ${spStage?.color||"#E8E0D4"}` }}>
+                    <div style={{ display:"flex", justifyContent:"space-between" }}>
+                      <span style={{ fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>↳ {sp.name}</span>
+                      <span style={{ fontSize:11, fontWeight:700, color:spStage?.color||"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{sp.progress}%</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── NOTES ENRICHIES ── */}
+      <div style={{ ...C, marginBottom:14 }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+          <h3 style={CT}>📝 Notes ({notes.length})</h3>
+          <button style={{ padding:"6px 12px", background:"#1A1A1A", color:"#E8E0D4", border:"none", borderRadius:8, cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
+            onClick={()=>setShowNoteForm(!showNoteForm)}>+ Note</button>
+        </div>
+
+        {showNoteForm && (
+          <div style={{ background:"#F5F0E8", borderRadius:10, padding:14, marginBottom:14 }}>
+            {/* Type de contact */}
+            <div style={{ marginBottom:10 }}>
+              <label style={L}>Type de contact</label>
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:6 }}>
+                {CONTACT_TYPES.map(ct=>(
+                  <button key={ct.id} style={{ padding:"6px 12px", border:`2px solid ${noteForm.contact_type===ct.id?"#1A1A1A":"#E8E0D4"}`, borderRadius:20, background:noteForm.contact_type===ct.id?"#1A1A1A":"transparent", color:noteForm.contact_type===ct.id?"#fff":"#888", cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif" }}
+                    onClick={()=>nf("contact_type",ct.id)}>{ct.icon} {ct.id==="physical"?"Physique":ct.id==="phone"?"Téléphone":ct.id==="email"?"Email":"Note"}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Contenu */}
+            <div style={{ marginBottom:10 }}>
+              <label style={L}>Note *</label>
+              <textarea style={{ ...I, minHeight:80, resize:"vertical" }} placeholder="Contenu de la note..." value={noteForm.content} onChange={e=>nf("content",e.target.value)} />
+            </div>
+
+            <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:10, marginBottom:10 }}>
+              {/* Statut */}
+              <div>
+                <label style={L}>Statut</label>
+                <select style={{ ...I, cursor:"pointer" }} value={noteForm.contact_status} onChange={e=>nf("contact_status",e.target.value)}>
+                  <option value="">— Inchangé —</option>
+                  {["froid","tiede","chaud","converti"].map(st=>(
+                    <option key={st} value={st}>{STATUS_COLORS[st]?.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date de relance */}
+              <div>
+                <label style={L}>📅 Date de relance</label>
+                <input style={I} type="date" value={noteForm.followup_date} onChange={e=>nf("followup_date",e.target.value)} min={new Date().toISOString().split("T")[0]} />
+              </div>
+
+              {/* Projet lié */}
+              <div>
+                <label style={L}>Projet lié</label>
+                <select style={{ ...I, cursor:"pointer" }} value={noteForm.project_id} onChange={e=>nf("project_id",e.target.value)}>
+                  <option value="">— Aucun —</option>
+                  {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+
+              {/* Avancement */}
+              <div>
+                <label style={L}>Avancement projet</label>
+                <select style={{ ...I, cursor:"pointer" }} value={noteForm.progress||""} onChange={e=>nf("progress",e.target.value||null)}>
+                  <option value="">— Sans —</option>
+                  {PROGRESS_STAGES.map(s=>(
+                    <option key={s.value} value={s.value}>{s.value}% — {lang==="fr"?s.label_fr:s.label_en}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Montant */}
+              <div>
+                <label style={L}>Montant</label>
+                <div style={{ display:"flex", gap:6 }}>
+                  <input style={{ ...I, flex:1 }} type="number" min="0" placeholder="0" value={noteForm.amount} onChange={e=>nf("amount",e.target.value)} />
+                  <select style={{ ...I, width:70, padding:"11px 8px", cursor:"pointer" }} value={noteForm.currency} onChange={e=>nf("currency",e.target.value)}>
+                    {CURRENCIES.map(cu=><option key={cu.code} value={cu.code}>{cu.symbol}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display:"flex", gap:8 }}>
+              <button style={{ ...BS, flex:1 }} onClick={()=>setShowNoteForm(false)}>{t("cancel",lang)}</button>
+              <button style={{ ...BP, flex:1 }} onClick={saveNote} disabled={savingNote}>{savingNote?"...":"✅ Enregistrer la note"}</button>
+            </div>
+          </div>
+        )}
+
+        {notes.length === 0 && !showNoteForm && (
+          <div style={{ fontSize:13, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", textAlign:"center", padding:"10px 0" }}>Aucune note</div>
+        )}
+
+        {notes.map(note => {
+          const ct = CONTACT_TYPES.find(t=>t.id===note.contact_type);
+          const stage = PROGRESS_STAGES.find(s=>s.value===note.progress);
+          const proj = projects.find(p=>p.id===note.project_id);
+          const isOverdue = note.followup_date && new Date(note.followup_date) < new Date();
+          const isTodayFollowup = note.followup_date && new Date(note.followup_date).toDateString() === new Date().toDateString();
+          return (
+            <div key={note.id} style={{ padding:"12px 0", borderBottom:"1px solid #F0EBE0", position:"relative" }}>
+              {/* Header */}
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
+                <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap" }}>
+                  <span style={{ fontSize:16 }}>{ct?.icon||"📝"}</span>
+                  <span style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>
+                    {new Date(note.created_at).toLocaleDateString()} {new Date(note.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}
+                  </span>
+                  {note.contact_status && (
+                    <div style={{ ...SB, background:STATUS_COLORS[note.contact_status]?.bg, color:STATUS_COLORS[note.contact_status]?.text, fontSize:9 }}>
+                      {STATUS_COLORS[note.contact_status]?.label}
+                    </div>
+                  )}
+                  {stage && (
+                    <div style={{ fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:10, background:stage.color, color:stage.value>=50?"#fff":"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>
+                      {stage.value}% {lang==="fr"?stage.label_fr:stage.label_en}
+                    </div>
+                  )}
+                  {proj && <span style={{ fontSize:10, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>📁 {proj.name}</span>}
+                </div>
+                <button style={{ border:"none", background:"transparent", color:"#ddd", cursor:"pointer", fontSize:14, padding:0 }} onClick={()=>deleteNote(note.id)}>🗑</button>
+              </div>
+
+              {/* Contenu */}
+              <p style={{ fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#444", lineHeight:1.6, margin:"0 0 6px" }}>{note.content}</p>
+
+              {/* Footer */}
+              <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+                {note.amount && (
+                  <span style={{ fontSize:12, fontWeight:700, color:"#1A1A1A", fontFamily:"'Helvetica Neue',sans-serif" }}>
+                    {note.amount.toLocaleString()} {CURRENCIES.find(c=>c.code===note.currency)?.symbol}
+                  </span>
+                )}
+                {note.followup_date && (
+                  <span style={{ fontSize:11, fontWeight:600, padding:"2px 8px", borderRadius:10, background:isOverdue?"#FF2D2D":isTodayFollowup?"#FF9500":"#E8F4FF", color:isOverdue||isTodayFollowup?"#fff":"#1A6AFF", fontFamily:"'Helvetica Neue',sans-serif" }}>
+                    {isOverdue?"⚠️ ":"📅 "}Relance : {new Date(note.followup_date).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       <div style={{ background:"#FFF8F4", borderRadius:12, padding:18, border:"2px solid #FFD4C4", marginBottom:14 }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
@@ -2691,26 +3019,43 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
 }
 
 function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
-  const [period, setPeriod]       = useState("month");  // "week" | "month"
+  const [period, setPeriod]         = useState("month");
   const [showObjForm, setShowObjForm] = useState(false);
-  const [objectives, setObjectives]   = useState(() => {
-    try { return JSON.parse(localStorage.getItem("prospeo_objectives") || "{}"); }
-    catch { return {}; }
-  });
-  const [objForm, setObjForm]     = useState({ monthly:"", quarterly:"", annual:"" });
+  const [dbObjectives, setDbObjectives] = useState([]);
+  const [allProfiles, setAllProfiles]   = useState([]);
+  const [followups, setFollowups]       = useState([]);
+  const [objForm, setObjForm]     = useState({});
   const [savingObj, setSavingObj] = useState(false);
-
   const STATUS_COLORS = getStatusColors(lang);
+  const now = new Date();
+
+  // ── Load data ──
+  useEffect(() => {
+    // Load all commercials
+    supabase.from("profiles").select("id,full_name,first_name,last_name,email,role")
+      .neq("email","fanne@lafitel.eu")
+      .then(({data})=>setAllProfiles(data||[]));
+    // Load objectives from Supabase
+    supabase.from("objectives").select("*")
+      .eq("manager_id", profile.id)
+      .then(({data})=>setDbObjectives(data||[]));
+    // Load followups (today + overdue)
+    supabase.from("contact_notes")
+      .select("*, contacts:contact_id(first_name,last_name,company,status), profiles:user_id(full_name,email)")
+      .not("followup_date","is",null)
+      .lte("followup_date", new Date().toISOString().split("T")[0])
+      .order("followup_date", {ascending:true})
+      .then(({data})=>setFollowups(data||[]));
+  }, []);
 
   // ── Period filter ──
-  const now = new Date();
   const filtered = contacts.filter(c => {
     const d = new Date(c.created_at);
     if (period === "week") {
       const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
       return d >= weekAgo;
     } else {
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
     }
   });
 
@@ -2724,59 +3069,93 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
   };
   const convRate = stats.total > 0 ? Math.round((stats.converti/stats.total)*100) : 0;
 
-  // ── Objectif courant ──
-  const monthKey = `${now.getFullYear()}-${now.getMonth()+1}`;
+  // ── Period keys ──
+  const monthKey   = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
   const quarterKey = `${now.getFullYear()}-Q${Math.ceil((now.getMonth()+1)/3)}`;
-  const yearKey = `${now.getFullYear()}`;
-  const objMonth   = parseInt(objectives[`monthly-${monthKey}`]   || objectives["monthly"]   || 0);
-  const objQuarter = parseInt(objectives[`quarterly-${quarterKey}`] || objectives["quarterly"] || 0);
-  const objAnnual  = parseInt(objectives[`annual-${yearKey}`]     || objectives["annual"]    || 0);
+  const yearKey    = `${now.getFullYear()}`;
+  const weekKey    = `${now.getFullYear()}-W${String(Math.ceil((now - new Date(now.getFullYear(),0,1))/(7*86400000))).padStart(2,"0")}`;
 
-  // All-time for annual
-  const annualTotal = contacts.filter(c => new Date(c.created_at).getFullYear() === now.getFullYear()).length;
-  // Quarter total
-  const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth()/3)*3, 1);
-  const quarterTotal = contacts.filter(c => new Date(c.created_at) >= qStart).length;
+  // ── Get objective for a commercial and period ──
+  const getObj = (commercialId, periodType, key) => {
+    const obj = dbObjectives.find(o=>o.commercial_id===commercialId && o.period_type===periodType && o.period_key===key);
+    return obj?.target || 0;
+  };
+
+  // Annual & quarter totals
+  const annualTotal   = contacts.filter(c=>new Date(c.created_at).getFullYear()===now.getFullYear()).length;
+  const qStart        = new Date(now.getFullYear(), Math.floor(now.getMonth()/3)*3, 1);
+  const quarterTotal  = contacts.filter(c=>new Date(c.created_at)>=qStart).length;
 
   // ── Stats par commercial ──
-  const byRep = {};
+  const byRepId = {};
   contacts.filter(c => {
     const d = new Date(c.created_at);
-    if (period === "week") { const w = new Date(now); w.setDate(now.getDate()-7); return d>=w; }
+    if (period==="week") { const w=new Date(now); w.setDate(now.getDate()-7); return d>=w; }
     return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
   }).forEach(c => {
+    const uid = c.user_id || c.profiles?.id || "unknown";
     const name = displayName(c.profiles) || "—";
-    if (!byRep[name]) byRep[name] = { total:0, froid:0, tiede:0, chaud:0, converti:0 };
-    byRep[name].total++;
-    byRep[name][c.status] = (byRep[name][c.status]||0) + 1;
+    if (!byRepId[uid]) byRepId[uid] = { name, total:0, froid:0, tiede:0, chaud:0, converti:0, userId:uid };
+    byRepId[uid].total++;
+    byRepId[uid][c.status] = (byRepId[uid][c.status]||0)+1;
   });
-  const repList = Object.entries(byRep).sort((a,b)=>b[1].total-a[1].total);
+  const repList = Object.values(byRepId).sort((a,b)=>b.total-a.total);
 
-  const saveObjectives = () => {
+  // ── Save objectives to Supabase ──
+  const saveObjectives = async () => {
     setSavingObj(true);
-    const newObj = {
-      ...objectives,
-      [`monthly-${monthKey}`]:     objForm.monthly   || objectives[`monthly-${monthKey}`]   || "",
-      [`quarterly-${quarterKey}`]: objForm.quarterly || objectives[`quarterly-${quarterKey}`] || "",
-      [`annual-${yearKey}`]:       objForm.annual    || objectives[`annual-${yearKey}`]     || "",
-      monthly:   objForm.monthly   || objectives["monthly"]   || "",
-      quarterly: objForm.quarterly || objectives["quarterly"] || "",
-      annual:    objForm.annual    || objectives["annual"]    || "",
-    };
-    setObjectives(newObj);
-    localStorage.setItem("prospeo_objectives", JSON.stringify(newObj));
-    setObjForm({ monthly:"", quarterly:"", annual:"" });
+    const inserts = [];
+    for (const [uid, fields] of Object.entries(objForm)) {
+      for (const [periodType, target] of Object.entries(fields)) {
+        if (!target) continue;
+        const key = periodType==="monthly"?monthKey:periodType==="weekly"?weekKey:periodType==="quarterly"?quarterKey:yearKey;
+        inserts.push({
+          manager_id: profile.id,
+          commercial_id: uid,
+          period_type: periodType,
+          period_key: key,
+          target: parseInt(target),
+        });
+      }
+    }
+    if (inserts.length > 0) {
+      await supabase.from("objectives").upsert(inserts, { onConflict:"commercial_id,period_type,period_key" });
+      const {data} = await supabase.from("objectives").select("*").eq("manager_id",profile.id);
+      setDbObjectives(data||[]);
+    }
+    setObjForm({});
     setShowObjForm(false);
     notify(t("mgr_obj_saved",lang));
     setSavingObj(false);
   };
+
+  // ── Export Excel ──
+  const exportExcel = () => {
+    let csv = "\uFEFF";
+    csv += ["Commercial","Total","Froid","Tiède","Chaud","Converti","Tx Conv%","Obj Mensuel","Obj Trimestriel","Obj Annuel"].join(";")+"\n";
+    repList.forEach(r => {
+      const conv = r.total>0?Math.round((r.converti/r.total)*100):0;
+      const om = getObj(r.userId,"monthly",monthKey);
+      const oq = getObj(r.userId,"quarterly",quarterKey);
+      const oa = getObj(r.userId,"annual",yearKey);
+      csv += [r.name,r.total,r.froid,r.tiede,r.chaud,r.converti,conv+"%",om||"—",oq||"—",oa||"—"].join(";")+"\n";
+    });
+    const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href=url; a.download=`objectifs-${monthKey}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ── Followup stats ──
+  const overdueFollowups = followups.filter(n=>new Date(n.followup_date)<new Date(new Date().toDateString()));
+  const todayFollowups   = followups.filter(n=>new Date(n.followup_date).toDateString()===new Date().toDateString());
 
   const ProgressBar = ({ value, target, color="#FF4C1A" }) => {
     const pct = target > 0 ? Math.min(100, Math.round((value/target)*100)) : 0;
     return (
       <div>
         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-          <span style={{ fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>{value} / {target || "—"}</span>
+          <span style={{ fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>{value} / {target||"—"}</span>
           <span style={{ fontSize:12, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", color:pct>=100?"#00C48C":color }}>{target>0?pct+"%":"—"}</span>
         </div>
         <div style={{ height:8, background:"#F0EBE0", borderRadius:4, overflow:"hidden" }}>
@@ -2793,30 +3172,97 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
           <h1 style={T(isMobile)}>🎯 {t("mgr_title",lang)}</h1>
           <p style={Sub}>{t("mgr_per_rep",lang)}</p>
         </div>
-        <button style={{ ...BP, fontSize:12, padding:"8px 14px" }} onClick={()=>{ setObjForm({ monthly: String(objMonth||""), quarterly: String(objQuarter||""), annual: String(objAnnual||"") }); setShowObjForm(!showObjForm); }}>
-          🎯 {t("mgr_set_obj",lang)}
-        </button>
+        <div style={{ display:"flex", gap:8 }}>
+          <button style={{ ...BP, fontSize:12, padding:"8px 14px" }} onClick={()=>setShowObjForm(!showObjForm)}>
+            🎯 {t("mgr_set_obj",lang)}
+          </button>
+          <button style={{ ...BS, fontSize:12, padding:"8px 14px" }} onClick={exportExcel}>
+            📥 Export Excel
+          </button>
+        </div>
       </div>
 
-      {/* ── Formulaire objectifs ── */}
+      {/* ── Relances ── */}
+      {(overdueFollowups.length > 0 || todayFollowups.length > 0) && (
+        <div style={{ marginBottom:16 }}>
+          {overdueFollowups.length > 0 && (
+            <div style={{ background:"#FFF0F0", border:"2px solid #FF2D2D", borderRadius:12, padding:14, marginBottom:10 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:"#FF2D2D", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:8 }}>
+                ⚠️ {overdueFollowups.length} relance{overdueFollowups.length>1?"s":""} en retard
+              </div>
+              {overdueFollowups.slice(0,5).map(n=>(
+                <div key={n.id} style={{ display:"flex", justifyContent:"space-between", padding:"5px 0", borderBottom:"1px solid #FFD0D0", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif" }}>
+                  <span>{n.contacts?.first_name} {n.contacts?.last_name} {n.contacts?.company?`(${n.contacts.company})`:""}</span>
+                  <span style={{ color:"#FF2D2D", fontWeight:700 }}>📅 {new Date(n.followup_date).toLocaleDateString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {todayFollowups.length > 0 && (
+            <div style={{ background:"#FFF8F0", border:"2px solid #FF9500", borderRadius:12, padding:14 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:"#FF9500", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:8 }}>
+                📅 {todayFollowups.length} relance{todayFollowups.length>1?"s":""} aujourd'hui
+              </div>
+              {todayFollowups.map(n=>(
+                <div key={n.id} style={{ display:"flex", justifyContent:"space-between", padding:"5px 0", borderBottom:"1px solid #FFE0B0", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif" }}>
+                  <span>{n.contacts?.first_name} {n.contacts?.last_name} {n.contacts?.company?`(${n.contacts.company})`:""}</span>
+                  <span style={{ color:"#888", fontSize:11 }}>{n.profiles?.full_name||n.profiles?.email||"—"}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Formulaire objectifs par commercial ── */}
       {showObjForm && (
         <div style={{ ...C, marginBottom:16, border:"2px solid #FF4C1A" }}>
           <h3 style={CT}>{t("mgr_set_obj",lang)}</h3>
-          <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr 1fr", gap:12, marginBottom:14 }}>
-            {[
-              { key:"monthly",   label:t("mgr_monthly",lang),   ph:"ex: 30" },
-              { key:"quarterly", label:t("mgr_quarterly",lang), ph:"ex: 90" },
-              { key:"annual",    label:t("mgr_annual",lang),    ph:"ex: 360" },
-            ].map(f=>(
-              <div key={f.key}>
-                <label style={L}>{f.label}</label>
-                <input style={I} type="number" min="0" placeholder={f.ph}
-                  value={objForm[f.key]}
-                  onChange={e=>setObjForm(p=>({...p,[f.key]:e.target.value}))} />
+          <p style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 12px" }}>
+            Saisie mensuelle → calcul automatique semaine / trimestre / année
+          </p>
+          {allProfiles.filter(p=>p.role!=="manager"&&p.email!=="fanne@lafitel.eu").map(rep=>{
+            const repForm = objForm[rep.id]||{};
+            const monthly = parseInt(repForm.monthly||getObj(rep.id,"monthly",monthKey)||0);
+            return (
+              <div key={rep.id} style={{ padding:"12px 0", borderBottom:"1px solid #F0EBE0" }}>
+                <div style={{ fontSize:13, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A", marginBottom:8 }}>
+                  👤 {displayName(rep)}
+                </div>
+                <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)", gap:8 }}>
+                  {[
+                    { key:"monthly",   label:t("mgr_monthly",lang),   auto:null },
+                    { key:"weekly",    label:"Sem.",                   auto:monthly>0?Math.round(monthly/4):0 },
+                    { key:"quarterly", label:t("mgr_quarterly",lang),  auto:monthly>0?monthly*3:0 },
+                    { key:"annual",    label:t("mgr_annual",lang),     auto:monthly>0?monthly*12:0 },
+                  ].map(f=>(
+                    <div key={f.key}>
+                      <label style={L}>{f.label}{f.auto>0?` (auto: ${f.auto})`:""}</label>
+                      <input style={{ ...I, padding:"8px 10px" }} type="number" min="0"
+                        value={repForm[f.key]||(f.auto>0?f.auto:"")}
+                        onChange={e=>{
+                          const val = e.target.value;
+                          setObjForm(p=>({
+                            ...p,
+                            [rep.id]: {
+                              ...(p[rep.id]||{}),
+                              [f.key]: val,
+                              ...(f.key==="monthly" && val ? {
+                                weekly:    String(Math.round(parseInt(val)/4)),
+                                quarterly: String(parseInt(val)*3),
+                                annual:    String(parseInt(val)*12),
+                              } : {}),
+                            }
+                          }));
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
-          <div style={{ display:"flex", gap:10 }}>
+            );
+          })}
+          <div style={{ display:"flex", gap:10, marginTop:14 }}>
             <button style={{ ...BS, flex:1 }} onClick={()=>setShowObjForm(false)}>{t("cancel",lang)}</button>
             <button style={{ ...BP, flex:1 }} onClick={saveObjectives} disabled={savingObj}>{t("mgr_save_obj",lang)}</button>
           </div>
@@ -2850,9 +3296,9 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
       {/* ── Objectifs & Progression ── */}
       <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr 1fr", gap:12, marginBottom:16 }}>
         {[
-          { label:t("mgr_monthly",lang),   value:stats.total,    target:objMonth,   note:`${now.toLocaleDateString("fr-FR",{month:"long"})}` },
-          { label:t("mgr_quarterly",lang), value:quarterTotal,   target:objQuarter, note:`Q${Math.ceil((now.getMonth()+1)/3)} ${now.getFullYear()}` },
-          { label:t("mgr_annual",lang),    value:annualTotal,    target:objAnnual,  note:`${now.getFullYear()}` },
+          { label:t("mgr_monthly",lang),   value:stats.total,  target:repList.reduce((s,r)=>s+getObj(r.userId,"monthly",monthKey),0),   note:`${now.toLocaleDateString([],{month:"long"})}` },
+          { label:t("mgr_quarterly",lang), value:quarterTotal, target:repList.reduce((s,r)=>s+getObj(r.userId,"quarterly",quarterKey),0), note:`Q${Math.ceil((now.getMonth()+1)/3)} ${now.getFullYear()}` },
+          { label:t("mgr_annual",lang),    value:annualTotal,  target:repList.reduce((s,r)=>s+getObj(r.userId,"annual",yearKey),0),       note:`${now.getFullYear()}` },
         ].map(obj=>(
           <div key={obj.label} style={C}>
             <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10 }}>
@@ -2870,6 +3316,31 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
             )}
           </div>
         ))}
+      </div>
+
+      {/* ── Graphique 6 mois ── */}
+      <div style={{ ...C, marginBottom:16 }}>
+        <h3 style={CT}>📈 Évolution — 6 derniers mois</h3>
+        <div style={{ display:"flex", alignItems:"flex-end", gap:8, height:120, paddingTop:10 }}>
+          {Array.from({length:6},(_,i)=>{
+            const d = new Date(); d.setMonth(d.getMonth()-5+i);
+            const count = contacts.filter(c=>{
+              const cd=new Date(c.created_at);
+              return cd.getMonth()===d.getMonth() && cd.getFullYear()===d.getFullYear();
+            }).length;
+            const maxCount = Math.max(...Array.from({length:6},(_,j)=>{
+              const dd=new Date(); dd.setMonth(dd.getMonth()-5+j);
+              return contacts.filter(c=>{const cd=new Date(c.created_at);return cd.getMonth()===dd.getMonth()&&cd.getFullYear()===dd.getFullYear();}).length;
+            }),1);
+            return (
+              <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>{count}</div>
+                <div style={{ width:"100%", height:`${Math.round((count/maxCount)*80)+8}px`, background:i===5?"#FF4C1A":"#E8E0D4", borderRadius:"4px 4px 0 0" }} />
+                <div style={{ fontSize:10, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{d.toLocaleDateString([],{month:"short"})}</div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── Taux de conversion ── */}
@@ -2896,33 +3367,48 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
         </div>
       </div>
 
-      {/* ── Comparatif par commercial ── */}
+      {/* ── Comparatif par commercial avec objectifs ── */}
       <div style={C}>
         <h3 style={CT}>{t("mgr_per_rep",lang)}</h3>
         {repList.length === 0 ? (
           <div style={LT}>{t("no_prospects",lang)}</div>
         ) : (
           <div>
-            {repList.map(([name, s]) => {
-              const repConv = s.total > 0 ? Math.round((s.converti/s.total)*100) : 0;
+            {repList.map(r => {
+              const repConv = r.total > 0 ? Math.round((r.converti/r.total)*100) : 0;
+              const objM = getObj(r.userId,"monthly",monthKey);
+              const pct  = objM > 0 ? Math.min(100, Math.round((r.total/objM)*100)) : null;
               return (
-                <div key={name} style={{ padding:"12px 0", borderBottom:"1px solid #F0EBE0" }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-                    <div style={{ fontSize:14, fontWeight:600, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>{name}</div>
+                <div key={r.userId} style={{ padding:"12px 0", borderBottom:"1px solid #F0EBE0" }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                    <div style={{ fontSize:14, fontWeight:600, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>{r.name}</div>
                     <div style={{ display:"flex", gap:6, alignItems:"center" }}>
-                      <span style={{ fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#888" }}>{s.total} prospects</span>
-                      <span style={{ fontSize:11, fontWeight:700, color:"#00C48C", background:"#EBF8F4", padding:"2px 8px", borderRadius:20, fontFamily:"'Helvetica Neue',sans-serif" }}>{repConv}% {t("mgr_conversion",lang)}</span>
+                      <span style={{ fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#888" }}>{r.total} prospects</span>
+                      <span style={{ fontSize:11, fontWeight:700, color:"#00C48C", background:"#EBF8F4", padding:"2px 8px", borderRadius:20, fontFamily:"'Helvetica Neue',sans-serif" }}>{repConv}% conv.</span>
                     </div>
                   </div>
-                  <div style={{ display:"flex", gap:4, height:8, borderRadius:4, overflow:"hidden" }}>
+                  {/* Barre statuts */}
+                  <div style={{ display:"flex", gap:4, height:8, borderRadius:4, overflow:"hidden", marginBottom:4 }}>
                     {["froid","tiede","chaud","converti"].map(st=>(
-                      s[st] > 0 && <div key={st} style={{ flex:s[st], background:STATUS_COLORS[st]?.bg }} title={`${STATUS_COLORS[st]?.label}: ${s[st]}`} />
+                      r[st] > 0 && <div key={st} style={{ flex:r[st], background:STATUS_COLORS[st]?.bg }} />
                     ))}
                   </div>
+                  {/* Objectif mensuel */}
+                  {objM > 0 && (
+                    <div style={{ marginTop:6 }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:2 }}>
+                        <span style={{ fontSize:10, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>Obj. mensuel: {r.total}/{objM}</span>
+                        <span style={{ fontSize:10, fontWeight:700, color:pct>=100?"#00C48C":"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>{pct}%</span>
+                      </div>
+                      <div style={{ height:5, background:"#F0EBE0", borderRadius:3, overflow:"hidden" }}>
+                        <div style={{ height:"100%", width:`${pct}%`, background:pct>=100?"#00C48C":"#FF4C1A", borderRadius:3 }} />
+                      </div>
+                    </div>
+                  )}
                   <div style={{ display:"flex", gap:12, marginTop:6 }}>
-                    {["froid","tiede","chaud","converti"].filter(st=>s[st]>0).map(st=>(
+                    {["froid","tiede","chaud","converti"].filter(st=>r[st]>0).map(st=>(
                       <span key={st} style={{ fontSize:10, fontFamily:"'Helvetica Neue',sans-serif", color:STATUS_COLORS[st]?.bg }}>
-                        {STATUS_COLORS[st]?.label}: {s[st]}
+                        {STATUS_COLORS[st]?.label}: {r[st]}
                       </span>
                     ))}
                   </div>
@@ -2933,7 +3419,7 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
         )}
       </div>
     </div>
-  );ac
+  );
 }
 
 
