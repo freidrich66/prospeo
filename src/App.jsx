@@ -519,7 +519,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
 
       <div style={C}>
         <h3 style={CT}>{t("last_prospects",lang)}</h3>
-        {loadingData ? <div style={LT}>Chargement...</div> :
+        {loadingData ? <div style={LT}>{t("loading",lang)}</div> :
           contacts.slice(0,5).map(c=>(
             <div key={c.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"11px 0", borderBottom:"1px solid #F0EBE0", cursor:"pointer" }} onClick={()=>onSelect(c)}>
               <div style={AV}>{c.first_name[0]}{c.last_name[0]}</div>
@@ -1016,18 +1016,18 @@ function ListView({ contacts, profile, loadingData, isMobile, lang="fr", onSelec
   return (
     <div style={P(isMobile)}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
-        <h1 style={T(isMobile)}>{profile?.role==="manager"?t("nav_prospects",lang):"Mes prospects"}</h1>
-        {!isMobile && <button style={BP} onClick={onAdd}>＋ Nouveau</button>}
+        <h1 style={T(isMobile)}>{t("nav_prospects",lang)}</h1>
+        {!isMobile && <button style={BP} onClick={onAdd}>＋ {t("nav_add",lang)}</button>}
       </div>
       <input style={{ ...I, marginBottom:10, width:"100%" }} placeholder={"🔍  " + t("search",lang)} value={search} onChange={e=>setSearch(e.target.value)} />
       <div style={{ display:"flex", gap:6, marginBottom:14, overflowX:"auto", paddingBottom:4 }}>
         {["all","chaud","tiede","froid","converti"].map(st=>(
           <button key={st} style={{ padding:"6px 11px", border:`2px solid ${fs===st?"#1A1A1A":"#E8E0D4"}`, borderRadius:20, background:fs===st?"#1A1A1A":"transparent", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:fs===st?"#E8E0D4":"#888", flexShrink:0 }}
-            onClick={()=>setFs(st)}>{st==="all"?"Tous":STATUS_COLORS[st]?.label}</button>
+            onClick={()=>setFs(st)}>{st==="all"?t("all",lang):STATUS_COLORS[st]?.label}</button>
         ))}
       </div>
       <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-        {loadingData ? <div style={LT}>Chargement...</div> :
+        {loadingData ? <div style={LT}>{t("loading",lang)}</div> :
           filtered.length===0 ? <div style={{ padding:40, textAlign:"center", color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif" }}>{t("no_prospects",lang)}</div> :
           filtered.map(c=>(
             <div key={c.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"13px 15px", background:"#fff", borderRadius:12, cursor:"pointer", boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }} onClick={()=>onSelect(c)}>
@@ -1039,7 +1039,7 @@ function ListView({ contacts, profile, loadingData, isMobile, lang="fr", onSelec
               </div>
               <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4, flexShrink:0 }}>
                 <div style={{ ...SB, background:getStatusColors(lang||"fr")[c.status]?.bg, color:getStatusColors(lang||"fr")[c.status]?.text }}>{getStatusColors(lang||"fr")[c.status]?.label}</div>
-                <div style={{ fontSize:10, color:"#bbb", fontFamily:"'Helvetica Neue',sans-serif" }}>{new Date(c.created_at).toLocaleDateString("fr-FR")}</div>
+                <div style={{ fontSize:10, color:"#bbb", fontFamily:"'Helvetica Neue',sans-serif" }}>{new Date(c.created_at).toLocaleDateString(lang==="zh"?"zh-CN":lang==="de"?"de-DE":lang==="es"?"es-ES":lang==="pt"?"pt-PT":lang==="it"?"it-IT":lang==="no"?"nb-NO":lang==="sv"?"sv-SE":lang==="nl"?"nl-NL":"fr-FR")}</div>
               </div>
             </div>
           ))
@@ -1171,7 +1171,7 @@ function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBa
       </div>
 
       <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:10, marginBottom:14 }}>
-        {[{icon:"✉️",label:t("email",lang),value:c.email},{icon:"📞",label:t("phone",lang),value:c.phone},{icon:"🏢",label:t("company",lang),value:c.company},{icon:"📅",label:t("date",lang),value:new Date(c.created_at).toLocaleDateString("fr-FR")}]
+        {[{icon:"✉️",label:t("email",lang),value:c.email},{icon:"📞",label:t("phone",lang),value:c.phone},{icon:"🏢",label:t("company",lang),value:c.company},{icon:"📅",label:t("date",lang),value:new Date(c.created_at).toLocaleDateString(lang==="zh"?"zh-CN":lang==="de"?"de-DE":lang==="es"?"es-ES":lang==="pt"?"pt-PT":lang==="it"?"it-IT":lang==="no"?"nb-NO":lang==="sv"?"sv-SE":lang==="nl"?"nl-NL":"fr-FR")}]
           .filter(r=>r.value).map(row=>(
           <div key={row.label} style={{ display:"flex", gap:11, alignItems:"flex-start", padding:13, background:"#fff", borderRadius:10 }}>
             <span style={{ fontSize:17 }}>{row.icon}</span>
@@ -1241,7 +1241,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
 
   const exportExcel = () => {
     let csv = [t("first_name",lang),t("last_name",lang),t("company",lang),t("role",lang),t("email",lang),t("phone",lang),"Source",t("status",lang),t("notes",lang),"Commercial",t("date",lang)].join(";")+"\n";
-    filtered.forEach(c=>{ csv+=[c.first_name,c.last_name,c.company,c.role,c.email,c.phone,c.source,c.status,c.notes,c.profiles?.full_name||"",new Date(c.created_at).toLocaleDateString("fr-FR")].map(v=>`"${String(v||"").replace(/"/g,'""')}"`).join(";")+"\n"; });
+    filtered.forEach(c=>{ csv+=[c.first_name,c.last_name,c.company,c.role,c.email,c.phone,c.source,c.status,c.notes,c.profiles?.full_name||"",new Date(c.created_at).toLocaleDateString(lang==="zh"?"zh-CN":lang==="de"?"de-DE":lang==="es"?"es-ES":lang==="pt"?"pt-PT":lang==="it"?"it-IT":lang==="no"?"nb-NO":lang==="sv"?"sv-SE":lang==="nl"?"nl-NL":"fr-FR")].map(v=>`"${String(v||"").replace(/"/g,'""')}"`).join(";")+"\n"; });
     const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"})); a.download=`prospects_${period}_${new Date().toISOString().split("T")[0]}.csv`; a.click();
     notify("📊 Export téléchargé !");
   };
@@ -1330,7 +1330,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
             <div key={c.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 0", borderBottom:"1px solid #F0EBE0", cursor:"pointer" }} onClick={()=>onSelectContact && onSelectContact(c)}>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:"#1A1A1A" }}>{c.first_name} {c.last_name}</div>
-                <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.company||"—"} · {new Date(c.created_at).toLocaleDateString("fr-FR")}</div>
+                <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.company||"—"} · {new Date(c.created_at).toLocaleDateString(lang==="zh"?"zh-CN":lang==="de"?"de-DE":lang==="es"?"es-ES":lang==="pt"?"pt-PT":lang==="it"?"it-IT":lang==="no"?"nb-NO":lang==="sv"?"sv-SE":lang==="nl"?"nl-NL":"fr-FR")}</div>
                 {profile?.role==="manager" && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>{c.profiles?.full_name}</div>}
               </div>
               <div style={{ ...SB, background:getStatusColors(lang||"fr")[c.status]?.bg, color:getStatusColors(lang||"fr")[c.status]?.text, flexShrink:0 }}>{getStatusColors(lang||"fr")[c.status]?.label}</div>
