@@ -129,10 +129,9 @@ export const translations = {
   manager_label:       { fr:"👑 Manager",       en:"👑 Manager",      es:"👑 Manager",     pt:"👑 Manager",     it:"👑 Manager",      de:"👑 Manager",     no:"👑 Manager",     sv:"👑 Manager",     nl:"👑 Manager"      , zh:"👑 经理" },
   commercial_label:    { fr:"Commercial",       en:"Sales rep",       es:"Comercial",      pt:"Vendedor",       it:"Commerciale",     de:"Vertreter",      no:"Selger",         sv:"Säljare",        nl:"Vertegenw."      , zh:"销售员" },
   analyzing:           { fr:"Analyse IA...",    en:"AI analyzing...", es:"Analizando IA...",pt:"Analisando IA...",it:"Analisi IA...",  de:"KI analysiert...",no:"IA analyserer...",sv:"AI analyserar...",nl:"AI analyseert..." , zh:"AI分析中..." },
-};
 
   // ── ADD VIEW — vocal & misc ──────────────────────────────
-  vocal_unavailable:   { fr:"Vocal non disponible",      en:"Voice unavailable",        es:"Voz no disponible",      pt:"Voz indisponível",       it:"Voce non disponibile",    de:"Sprache nicht verfügbar", no:"Stemme utilgjengelig",   sv:"Röst ej tillgänglig",    nl:"Stem niet beschikbaar",  zh:"语音不可用"               },
+  vocal_unavailable:   { fr:"Vocal non disponible",      en:"Voice unavailable",        es:"Voz no disponible",      pt:"Voz indisponível",       it:"Voce non disponibile",    de:"Sprache nicht verfügbar", no:"Stemme utilgjengelig",   sv:"Röst ej tillgänglig",    nl:"Stem nicht beschikbaar",  zh:"语音不可用"               },
   open_in_chrome:      { fr:"Ouvrir dans Chrome",         en:"Open in Chrome",           es:"Abrir en Chrome",        pt:"Abrir no Chrome",        it:"Apri in Chrome",          de:"In Chrome öffnen",        no:"Åpne i Chrome",          sv:"Öppna i Chrome",         nl:"Openen in Chrome",       zh:"在Chrome中打开"            },
   vocal_not_supported: { fr:"Vocal non supporté",         en:"Voice not supported",      es:"Voz no compatible",      pt:"Voz não suportada",      it:"Voce non supportata",     de:"Sprache nicht unterstützt",no:"Stemme støttes ikke",   sv:"Röst stöds inte",        nl:"Stem niet ondersteund",  zh:"不支持语音"                },
   vocal_dictation:     { fr:"Dictée vocale",              en:"Voice dictation",          es:"Dictado de voz",         pt:"Ditado de voz",          it:"Dettatura vocale",        de:"Spracheingabe",           no:"Stemmedikte ring",        sv:"Röstdiktering",          nl:"Stemdicteren",           zh:"语音听写"                  },
@@ -145,6 +144,7 @@ export const translations = {
   yourself:            { fr:"vous-même",                  en:"yourself",                 es:"usted mismo",            pt:"você mesmo",             it:"te stesso",               de:"sich selbst",             no:"deg selv",               sv:"dig själv",              nl:"uzelf",                  zh:"您自己"                    },
   initial_status:      { fr:"Statut initial",             en:"Initial status",           es:"Estado inicial",         pt:"Status inicial",         it:"Stato iniziale",          de:"Anfangsstatus",           no:"Innledende status",      sv:"Inledande status",       nl:"Beginstatus",            zh:"初始状态"                  },
   prospect_added:      { fr:"ajouté !",                   en:"added!",                   es:"añadido!",               pt:"adicionado!",            it:"aggiunto!",               de:"hinzugefügt!",            no:"lagt til!",              sv:"tillagd!",               nl:"toegevoegd!",            zh:"已添加！"                  },
+};
 
 // ── Detect browser language ────────────────────────────────
 export function detectBrowserLang() {
