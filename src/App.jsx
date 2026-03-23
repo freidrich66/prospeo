@@ -355,7 +355,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
       {/* Main */}
       <main style={{ flex:1, overflow:"auto", paddingTop:isMobile?54:0, paddingBottom:isMobile?68:0 }}>
         {view==="dashboard" && <DashboardView contacts={contacts} stats={stats} loadingData={loadingData} profile={profile} isMobile={isMobile} go={go} lang={lang} subscription={subscription} globalSearch={globalSearch} setGlobalSearch={setGlobalSearch} onSelect={c=>{setSelected(c);setView("detail");}} />}
-        {view==="add"       && <AddView profile={profile} isMobile={isMobile} notify={notify} onAdded={()=>{loadContacts();setView("list");}} />}
+        {view==="add"       && <AddView profile={profile} isMobile={isMobile} notify={notify} lang={lang} onAdded={()=>{loadContacts();setView("list");}} />}
         {view==="list"      && <ListView contacts={contacts} profile={profile} loadingData={loadingData} isMobile={isMobile} lang={lang} onSelect={c=>{setSelected(c);setView("detail");}} onAdd={()=>go("add")} />}
         {view==="detail" && selected && <DetailView contact={selected} profile={profile} isMobile={isMobile} lang={lang} onBack={()=>setView("list")} onStatusUpdate={handleStatusUpdate} onDelete={handleDelete} notify={notify} />}
         {view==="report"    && <ReportView contacts={contacts} profile={profile} isMobile={isMobile} lang={lang} globalSearch={globalSearch} setGlobalSearch={setGlobalSearch} notify={notify} onSelectContact={c=>{setSelected(c);setView("detail");}} />}
@@ -644,7 +644,7 @@ function AddView({ profile, isMobile, notify, lang="fr", onAdded }) {
 
     // Block if duplicate detected (except for managers who can override)
     if (duplicate && profile?.role !== "manager") {
-      notify("⚠️ Ce prospect existe déjà dans la base", "error");
+      notify("⚠️ " + t("duplicate_own",lang), "error");
       return;
     }
 
@@ -679,7 +679,7 @@ function AddView({ profile, isMobile, notify, lang="fr", onAdded }) {
         const text = await scanCardAI(b64, file.type);
         const parsed = JSON.parse(text.replace(/```json|```/g,"").trim());
         setForm(p=>({...p,...parsed,source:"carte"}));
-        notify("📇 Carte analysée !");
+        notify("📇 " + t("success",lang));
       } catch { notify(t("error",lang),"error"); }
       setAnalyzing(false);
     };
@@ -798,12 +798,12 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
       fields.forEach(k => { if (parsed[k] !== undefined) update[k] = parsed[k]; });
 
       if (Object.keys(update).length === 0) {
-        notify("IA n'a pas trouvé d'informations dans le texte","error");
+        notify(t("error",lang),"error");
       } else {
         setForm(p=>({...p,...update,source:"vocal"}));
         setVocalFull(false);
         setVocalText("");
-        notify("🎙️ Contact extrait avec succès !");
+        notify("🎙️ " + t("success",lang));
       }
     } catch(err) {
       console.error("Erreur analyse vocale:", err.message);
@@ -954,7 +954,7 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
             style={{ width:"100%", padding:"12px", background: vocalText.trim() ? "#FF4C1A" : "#333", color: vocalText.trim() ? "#fff" : "#666", border:"none", borderRadius:10, cursor: vocalText.trim() ? "pointer" : "default", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
             onClick={()=>analyzeVocalText(vocalText)}
             disabled={!vocalText.trim()||vocalAnalyzing}>
-            {vocalAnalyzing ? <span style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}><div style={{ width:14, height:14, border:"2px solid rgba(255,255,255,0.3)", borderTopColor:"#fff", borderRadius:"50%", animation:"spin 0.8s linear infinite" }} />Analyse IA en cours...</span> : "✨ Extraire les informations"}
+            {vocalAnalyzing ? <span style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}><div style={{ width:14, height:14, border:"2px solid rgba(255,255,255,0.3)", borderTopColor:"#fff", borderRadius:"50%", animation:"spin 0.8s linear infinite" }} />{t("analyzing",lang)}</span> : "✨ Extraire les informations"}
           </button>
         </div>
       )}
