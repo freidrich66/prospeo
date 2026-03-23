@@ -975,7 +975,7 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
       </div>
 
       <div style={{ marginBottom:14 }}>
-        <label style={L}>Notes</label>
+        <label style={L}>{t("notes",lang)}</label>
         <div style={{ display:"flex", gap:8 }}>
           <textarea style={{ ...I, minHeight:85, resize:"vertical" }} placeholder="..." value={form.notes} onChange={e=>f("notes",e.target.value)} />
           <button style={{ width:43, height:43, border:`2px solid ${rec&&recF==="notes"?"#FF4C1A":"#E8E0D4"}`, borderRadius:8, background:rec&&recF==="notes"?"#FF4C1A":"#fff", cursor:"pointer", fontSize:15, flexShrink:0, alignSelf:"flex-start" }}
@@ -1259,7 +1259,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
 
       {period==="custom" && (
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
-          <div><label style={L}>Du</label><input type="date" style={I} value={cs} onChange={e=>setCs(e.target.value)} /></div>
+          <div><label style={L}>📅 Du</label><input type="date" style={I} value={cs} onChange={e=>setCs(e.target.value)} /></div>
           <div><label style={L}>Au</label><input type="date" style={I} value={ce} onChange={e=>setCe(e.target.value)} /></div>
         </div>
       )}
@@ -1507,25 +1507,25 @@ function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, onUpdat
         <h3 style={CT}>{t("personal_info",lang)}</h3>
         <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:14 }}>
           <div>
-            <label style={L}>Prénom</label>
+            <label style={L}>{t("first_name",lang)}</label>
             <input style={I} placeholder="Jean" value={form.first_name} onChange={e=>f("first_name",e.target.value)} />
           </div>
           <div>
-            <label style={L}>Nom</label>
+            <label style={L}>{t("last_name",lang)}</label>
             <input style={I} placeholder="Dupont" value={form.last_name} onChange={e=>f("last_name",e.target.value)} />
           </div>
           <div>
-            <label style={L}>Société</label>
+            <label style={L}>{t("company",lang)}</label>
             <input style={I} placeholder="Acme Corp" value={form.company} onChange={e=>f("company",e.target.value)} />
           </div>
           <div>
-            <label style={L}>Téléphone</label>
+            <label style={L}>{t("phone",lang)}</label>
             <input style={I} placeholder="+33 6 00 00 00 00" value={form.phone} onChange={e=>f("phone",e.target.value)} />
           </div>
         </div>
 
         <div style={{ marginTop:16, padding:"12px 14px", background:"#F5F0E8", borderRadius:10 }}>
-          <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, textTransform:"uppercase", letterSpacing:1, marginBottom:4 }}>Email</div>
+          <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, textTransform:"uppercase", letterSpacing:1, marginBottom:4 }}>{t("email",lang)}</div>
           <div style={{ fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", color:"#aaa" }}>{profile?.email}</div>
           <div style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>{t("email_readonly",lang)}</div>
         </div>
@@ -1712,7 +1712,7 @@ function ActivateKeyView({ profile, isMobile, lang="fr", notify, onActivated, in
     <div style={inline ? { marginTop:16 } : P(isMobile)}>
       {!inline && <h1 style={T(isMobile)}>Activer ma clé</h1>}
       <div style={{ marginTop:inline?0:20 }}>
-        <label style={L}>Clé d'activation</label>
+        <label style={L}>{t("activate_key",lang)}</label>
         <input style={{ ...I, textTransform:"uppercase", letterSpacing:2, fontFamily:"'Courier New',monospace", marginBottom:12 }}
           placeholder="PROS-XXXX-XXXX-XXXX"
           value={key}
@@ -1908,7 +1908,7 @@ function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
           <h3 style={CT}>Nouveau connecteur CRM</h3>
 
           <div style={{ marginBottom:14 }}>
-            <label style={L}>Votre CRM</label>
+            <label style={L}>{t("crm_type",lang)}</label>
             <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3,1fr)", gap:8 }}>
               {CRM_TYPES.map(crm => (
                 <button key={crm.id}
@@ -1921,7 +1921,7 @@ function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
           </div>
 
           <div style={{ marginBottom:14 }}>
-            <label style={L}>Nom de cette configuration</label>
+            <label style={L}>{t("nav_crm",lang)}</label>
             <input style={I} placeholder={`Ex: ${selectedCRM?.label} Production`}
               value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} />
           </div>
@@ -1940,7 +1940,7 @@ function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
 
           {form.crm_type === "generic" && (
             <div style={{ marginBottom:12 }}>
-              <label style={L}>Mapping des champs (optionnel)</label>
+              <label style={L}>Mapping</label>
               <div style={{ padding:12, background:"#F5F0E8", borderRadius:8, fontSize:12, fontFamily:"'Courier New',monospace", color:"#444", lineHeight:1.6 }}>
                 {`{
   "first_name": "FirstName",
@@ -2351,7 +2351,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
               <h3 style={CT}>Générer des clés d'activation</h3>
               <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:12, marginBottom:14 }}>
                 <div>
-                  <label style={L}>Nombre de licences</label>
+                  <label style={L}>{t("total",lang)}</label>
                   <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
                     <button style={{ width:36, height:36, border:"2px solid #E8E0D4", borderRadius:8, background:"#fff", cursor:"pointer", fontSize:18, fontWeight:700, color:"#1A1A1A" }}
                       onClick={()=>setGenQty(q=>Math.max(1,q-1))}>−</button>
@@ -2376,12 +2376,12 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
                 </div>
                 {parseInt(genQty) > 1 && (
                   <div>
-                    <label style={L}>Nom de l'entreprise</label>
+                    <label style={L}>{t("company",lang)}</label>
                     <input style={I} placeholder="Acme Corp" value={genCompany} onChange={e=>setGenCompany(e.target.value)} />
                   </div>
                 )}
                 <div>
-                  <label style={L}>Type de clé</label>
+                  <label style={L}>Type</label>
                   <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                     {[
                       { val:"annual", label:"💳 Payante (12 mois)", color:"#1A1A1A", textColor:"#E8E0D4" },
@@ -2395,7 +2395,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
                   </div>
                 </div>
                 <div>
-                  <label style={L}>Notes internes</label>
+                  <label style={L}>Notes</label>
                   <input style={I} placeholder="Ex: Offre salon..." value={genNotes} onChange={e=>setGenNotes(e.target.value)} />
                 </div>
               </div>
@@ -2477,7 +2477,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
               ) : (
                 <>
                   <div style={{ marginBottom:14 }}>
-                    <label style={L}>Entreprise cliente</label>
+                    <label style={L}>{t("company",lang)}</label>
                     <select value={addCompanyId} onChange={e=>setAddCompanyId(e.target.value)}
                       style={{ ...I, cursor:"pointer" }}>
                       <option value="">-- Sélectionner une entreprise --</option>
@@ -2502,7 +2502,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
 
                   <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
                     <div>
-                      <label style={L}>Licences à ajouter</label>
+                      <label style={L}>{t("total",lang)}</label>
                       <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                         <button style={{ width:36, height:36, border:"2px solid #E8E0D4", borderRadius:8, background:"#fff", cursor:"pointer", fontSize:18, fontWeight:700 }}
                           onClick={()=>setAddQty(q=>Math.max(1,q-1))}>−</button>
@@ -2532,7 +2532,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
                   </div>
 
                   <div style={{ marginBottom:14 }}>
-                    <label style={L}>Notes internes</label>
+                    <label style={L}>Notes</label>
                     <input style={I} placeholder="Ex: Extension contrat mars 2026..." value={addNotes} onChange={e=>setAddNotes(e.target.value)} />
                   </div>
 
