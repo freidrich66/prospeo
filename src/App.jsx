@@ -78,12 +78,12 @@ function isSuperManager(profile) {
   return profile?.email === SUPER_EMAIL;
 }
 
-function displayName(p) {
+function displayName(p, lang="fr") {
   if (!p) return "—";
   if (p.first_name && p.last_name) return `${p.first_name} ${p.last_name}`;
   if (p.full_name) return p.full_name;
   if (p.email) return p.email;
-  return t("commercial_label",lang);
+  return t("commercial_label", lang);
 }
 
 function getPeriodRange(periodId, customStart, customEnd) {
@@ -368,7 +368,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
         {view==="report"    && <ReportView contacts={contacts} profile={profile} isMobile={isMobile} lang={lang} globalSearch={globalSearch} setGlobalSearch={setGlobalSearch} notify={notify} onSelectContact={c=>{setSelected(c);setView("detail");}} />}
         {view==="profile"       && <ProfileView profile={profile} isMobile={isMobile} notify={notify} lang={lang} changeLang={changeLang} onUpdated={(p)=>{ setProfile(p); }} />}
         {view==="subscription"  && <SubscriptionView profile={profile} subscription={subscription} isMobile={isMobile} lang={lang} notify={notify} onActivated={loadSubscription} />}
-        {view==="activate"      && <ActivateKeyView profile={profile} isMobile={isMobile} notify={notify} onActivated={()=>{ loadSubscription(); setView("dashboard"); }} />}
+        {view==="activate"      && <ActivateKeyView profile={profile} isMobile={isMobile} lang={lang} notify={notify} onActivated={()=>{ loadSubscription(); setView("dashboard"); }} />}
         {view==="superadmin" && isSuperManager(profile) && <SuperAdminView profile={profile} isMobile={isMobile} lang={lang} notify={notify} />}
         {view==="crm"         && (
           isSuperManager(profile) || profile?.crm_enabled
@@ -526,7 +526,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
 
       <div style={C}>
         <h3 style={CT}>{t("last_prospects",lang)}</h3>
-        {loadingData ? <div style={LT}>{t("loading",lang)}</div> :
+        {loadingData ? <div style={LT}>Chargement...</div> :
           contacts.slice(0,5).map(c=>(
             <div key={c.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"11px 0", borderBottom:"1px solid #F0EBE0", cursor:"pointer" }} onClick={()=>onSelect(c)}>
               <div style={AV}>{c.first_name[0]}{c.last_name[0]}</div>
@@ -1034,7 +1034,7 @@ function ListView({ contacts, profile, loadingData, isMobile, lang="fr", onSelec
         ))}
       </div>
       <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-        {loadingData ? <div style={LT}>{t("loading",lang)}</div> :
+        {loadingData ? <div style={LT}>Chargement...</div> :
           filtered.length===0 ? <div style={{ padding:40, textAlign:"center", color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif" }}>{t("no_prospects",lang)}</div> :
           filtered.map(c=>(
             <div key={c.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"13px 15px", background:"#fff", borderRadius:12, cursor:"pointer", boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }} onClick={()=>onSelect(c)}>
@@ -1482,7 +1482,7 @@ function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, onUpdat
     setSaving(false);
   };
 
-  if (loading) return <div style={{ ...P(isMobile), textAlign:"center", paddingTop:60 }}><div style={{ fontSize:32, color:"#FF4C1A", marginBottom:10 }}>◈</div><div style={{ fontFamily:"'Helvetica Neue',sans-serif", color:"#888" }}>{t("loading",lang)}</div></div>;
+  if (loading) return <div style={{ ...P(isMobile), textAlign:"center", paddingTop:60 }}><div style={{ fontSize:32, color:"#FF4C1A", marginBottom:10 }}>◈</div><div style={{ fontFamily:"'Helvetica Neue',sans-serif", color:"#888" }}>Chargement...</div></div>;
 
   return (
     <div style={P(isMobile)}>
@@ -1875,7 +1875,7 @@ function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
       </div>
 
       {/* Configs existantes */}
-      {loading ? <div style={LT}>{t("loading",lang)}</div> : (
+      {loading ? <div style={LT}>Chargement...</div> : (
         <>
           {configs.length === 0 && !showForm && (
             <div style={{ ...C, textAlign:"center", padding:32, marginBottom:16 }}>
@@ -2117,7 +2117,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
         <p style={Sub}>Tableau de bord de gestion — accès exclusif</p>
       </div>
 
-      {loading ? <div style={LT}>{t("loading",lang)}</div> : (
+      {loading ? <div style={LT}>Chargement...</div> : (
         <>
           {/* Stats */}
           <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)", gap:10, marginBottom:20 }}>
@@ -2724,7 +2724,7 @@ function Loader() {
     <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh", background:"#F5F0E8" }}>
       <div style={{ textAlign:"center" }}>
         <div style={{ fontSize:38, color:"#FF4C1A", marginBottom:10 }}>◈</div>
-        <div style={{ fontFamily:"'Helvetica Neue',sans-serif", color:"#888", fontSize:13 }}>{t("loading",lang)}</div>
+        <div style={{ fontFamily:"'Helvetica Neue',sans-serif", color:"#888", fontSize:13 }}>Chargement...</div>
       </div>
     </div>
   );
