@@ -3,9 +3,9 @@ import { supabase } from "./supabase.js";
 import { LANGUAGES, t, detectBrowserLang, getSavedLang, saveLang } from "./i18n.js";
 
 const STATUS_COLORS_BASE = {
-  chaud:    { bg: "#FF4C1A", text: "#fff", key: "status_chaud"    },
-  tiede:    { bg: "#FF9500", text: "#fff", key: "status_tiede"    },
   froid:    { bg: "#E8E0D4", text: "#888", key: "status_froid"    },
+  tiede:    { bg: "#FF9500", text: "#fff", key: "status_tiede"    },
+  chaud:    { bg: "#FF4C1A", text: "#fff", key: "status_chaud"    },
   converti: { bg: "#00C48C", text: "#fff", key: "status_converti" },
 };
 const getStatusColors = (lang="fr") => Object.fromEntries(
@@ -288,6 +288,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
     { id:"report",        icon:"◉", label:t("nav_reports",lang)       },
     { id:"profile",       icon:"👤", label:t("nav_profile",lang)      },
     { id:"crm", icon:"🔗", label:t("nav_crm",lang) },
+    ...(profile?.role === "manager" ? [{ id:"mgrdashboard", icon:"🎯", label:t("nav_mgr",lang) }] : []),
     ...(profile?.role !== "manager" ? [{ id:"subscription", icon:"⭐", label:t("nav_subscription",lang) }] : []),
     ...(isSuperManager(profile) ? [{ id:"superadmin", icon:"🔐", label:t("nav_superadmin",lang) }] : []),
   ];
@@ -370,6 +371,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
         {view==="subscription"  && <SubscriptionView profile={profile} subscription={subscription} isMobile={isMobile} lang={lang} notify={notify} onActivated={loadSubscription} />}
         {view==="activate"      && <ActivateKeyView profile={profile} isMobile={isMobile} lang={lang} notify={notify} onActivated={()=>{ loadSubscription(); setView("dashboard"); }} />}
         {view==="superadmin" && isSuperManager(profile) && <SuperAdminView profile={profile} isMobile={isMobile} lang={lang} notify={notify} />}
+        {view==="mgrdashboard" && profile?.role === "manager" && <MgrDashboardView contacts={contacts} profile={profile} isMobile={isMobile} lang={lang} notify={notify} />}
         {view==="crm"         && (
           isSuperManager(profile) || profile?.crm_enabled
             ? <CRMConfigView profile={profile} isMobile={isMobile} lang={lang} notify={notify} />
@@ -1010,8 +1012,10 @@ Retourne ce JSON complété (string vide si info absente), RIEN D'AUTRE :
 }
 
 function ListView({ contacts, profile, loadingData, isMobile, lang="fr", onSelect, onAdd }) {
-  const [search, setSearch] = useState("");
-  const [fs, setFs]         = useState("all");
+  const [search, setSearch]     = useState("");
+  const [fs, setFs]             = useState("all");
+  const [viewMode, setViewMode] = useState("list");   // "list" | "company"
+  const [expanded, setExpanded] = useState({});       // companyName -> bool
   const STATUS_COLORS = getStatusColors(lang);
 
   const filtered = contacts.filter(c => {
@@ -1020,38 +1024,122 @@ function ListView({ contacts, profile, loadingData, isMobile, lang="fr", onSelec
     return ms && (!q||[c.first_name,c.last_name,c.company,c.email].some(v=>v?.toLowerCase().includes(q)));
   });
 
+  // ── Group by company ──
+  const byCompany = Object.entries(
+    filtered.reduce((acc, c) => {
+      const key = c.company?.trim() || "—";
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(c);
+      return acc;
+    }, {})
+  ).sort((a, b) => b[1].length - a[1].length);
+
   return (
     <div style={P(isMobile)}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
         <h1 style={T(isMobile)}>{t("nav_prospects",lang)}</h1>
         {!isMobile && <button style={BP} onClick={onAdd}>＋ {t("nav_add",lang)}</button>}
       </div>
+
+      {/* Toggle list / company */}
+      <div style={{ display:"flex", gap:6, marginBottom:12 }}>
+        <button style={{ padding:"7px 14px", border:`2px solid ${viewMode==="list"?"#1A1A1A":"#E8E0D4"}`, borderRadius:20, background:viewMode==="list"?"#1A1A1A":"transparent", color:viewMode==="list"?"#E8E0D4":"#888", cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
+          onClick={()=>setViewMode("list")}>≡ {t("nav_prospects",lang)}</button>
+        <button style={{ padding:"7px 14px", border:`2px solid ${viewMode==="company"?"#1A1A1A":"#E8E0D4"}`, borderRadius:20, background:viewMode==="company"?"#1A1A1A":"transparent", color:viewMode==="company"?"#E8E0D4":"#888", cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
+          onClick={()=>setViewMode("company")}>🏢 {t("company",lang)}</button>
+      </div>
+
       <input style={{ ...I, marginBottom:10, width:"100%" }} placeholder={"🔍  " + t("search",lang)} value={search} onChange={e=>setSearch(e.target.value)} />
-      <div style={{ display:"flex", gap:6, marginBottom:14, overflowX:"auto", paddingBottom:4 }}>
-        {["all","chaud","tiede","froid","converti"].map(st=>(
-          <button key={st} style={{ padding:"6px 11px", border:`2px solid ${fs===st?"#1A1A1A":"#E8E0D4"}`, borderRadius:20, background:fs===st?"#1A1A1A":"transparent", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:fs===st?"#E8E0D4":"#888", flexShrink:0 }}
-            onClick={()=>setFs(st)}>{st==="all"?t("all",lang):STATUS_COLORS[st]?.label}</button>
-        ))}
-      </div>
-      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-        {loadingData ? <div style={LT}>Chargement...</div> :
-          filtered.length===0 ? <div style={{ padding:40, textAlign:"center", color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif" }}>{t("no_prospects",lang)}</div> :
-          filtered.map(c=>(
-            <div key={c.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"13px 15px", background:"#fff", borderRadius:12, cursor:"pointer", boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }} onClick={()=>onSelect(c)}>
-              <div style={AV}>{c.first_name[0]}{c.last_name[0]}</div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:"#1A1A1A" }}>{c.first_name} {c.last_name}</div>
-                <div style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.role}{c.company?` · ${c.company}`:""}</div>
-                {profile?.role==="manager" && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>👤 {c.profiles?.full_name}</div>}
+
+      {/* Status filter — list mode only */}
+      {viewMode === "list" && (
+        <div style={{ display:"flex", gap:6, marginBottom:14, overflowX:"auto", paddingBottom:4 }}>
+          {["all","froid","tiede","chaud","converti"].map(st=>(
+            <button key={st} style={{ padding:"6px 11px", border:`2px solid ${fs===st?"#1A1A1A":"#E8E0D4"}`, borderRadius:20, background:fs===st?"#1A1A1A":"transparent", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:fs===st?"#E8E0D4":"#888", flexShrink:0 }}
+              onClick={()=>setFs(st)}>{st==="all"?t("all",lang):STATUS_COLORS[st]?.label}</button>
+          ))}
+        </div>
+      )}
+
+      {/* ── VUE PAR ENTREPRISE ── */}
+      {viewMode === "company" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+          {loadingData ? <div style={LT}>{t("loading",lang)}</div> :
+           byCompany.length === 0 ? <div style={{ padding:40, textAlign:"center", color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif" }}>{t("no_prospects",lang)}</div> :
+           byCompany.map(([company, cts]) => {
+            const isOpen = expanded[company];
+            const sorted = [...cts].sort((a,b) => new Date(b.created_at)-new Date(a.created_at));
+            const lastC  = sorted[0];
+            const statuses = [...new Set(cts.map(c=>c.status))];
+            const reps = [...new Set(cts.map(c=>c.profiles?.full_name||c.profiles?.email).filter(Boolean))];
+            return (
+              <div key={company} style={{ background:"#fff", borderRadius:12, boxShadow:"0 1px 4px rgba(0,0,0,0.06)", overflow:"hidden" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:12, padding:"13px 15px", cursor:"pointer" }}
+                  onClick={()=>setExpanded(e=>({...e,[company]:!e[company]}))}>
+                  <div style={{ width:40, height:40, borderRadius:10, background:"#F5F0E8", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>🏢</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{company}</div>
+                    <div style={{ display:"flex", gap:8, marginTop:4, flexWrap:"wrap", alignItems:"center" }}>
+                      <span style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>👤 {cts.length} contact{cts.length>1?"s":""}</span>
+                      <span style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif" }}>📅 {new Date(lastC.created_at).toLocaleDateString()}</span>
+                      {statuses.map(st=>(
+                        <div key={st} style={{ ...SB, background:STATUS_COLORS[st]?.bg, color:STATUS_COLORS[st]?.text, fontSize:9 }}>{STATUS_COLORS[st]?.label}</div>
+                      ))}
+                      {profile?.role==="manager" && reps.length > 0 && (
+                        <span style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>{reps.slice(0,2).join(", ")}{reps.length>2?` +${reps.length-2}`:""}</span>
+                      )}
+                    </div>
+                  </div>
+                  <span style={{ fontSize:16, color:"#aaa", transition:"transform 0.2s", display:"inline-block", transform:isOpen?"rotate(180deg)":"rotate(0deg)" }}>▾</span>
+                </div>
+                {isOpen && (
+                  <div style={{ borderTop:"1px solid #F0EBE0" }}>
+                    {sorted.map((c,i)=>(
+                      <div key={c.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 15px", borderBottom:i<sorted.length-1?"1px solid #F0EBE0":"none", cursor:"pointer", background:"#FAFAF8" }}
+                        onClick={()=>onSelect(c)}>
+                        <div style={{ ...AV, width:32, height:32, fontSize:12, flexShrink:0 }}>{c.first_name?.[0]}{c.last_name?.[0]}</div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:13, fontWeight:600, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>{c.first_name} {c.last_name}</div>
+                          <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                            {c.role||"—"}{profile?.role==="manager" && c.profiles?.full_name ? <span style={{ color:"#FF4C1A" }}> · {c.profiles.full_name}</span> : ""}
+                          </div>
+                        </div>
+                        <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:3, flexShrink:0 }}>
+                          <div style={{ ...SB, background:STATUS_COLORS[c.status]?.bg, color:STATUS_COLORS[c.status]?.text }}>{STATUS_COLORS[c.status]?.label}</div>
+                          <div style={{ fontSize:10, color:"#bbb", fontFamily:"'Helvetica Neue',sans-serif" }}>{new Date(c.created_at).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4, flexShrink:0 }}>
-                <div style={{ ...SB, background:getStatusColors(lang||"fr")[c.status]?.bg, color:getStatusColors(lang||"fr")[c.status]?.text }}>{getStatusColors(lang||"fr")[c.status]?.label}</div>
-                <div style={{ fontSize:10, color:"#bbb", fontFamily:"'Helvetica Neue',sans-serif" }}>{new Date(c.created_at).toLocaleDateString(lang==="zh"?"zh-CN":lang==="de"?"de-DE":lang==="es"?"es-ES":lang==="pt"?"pt-PT":lang==="it"?"it-IT":lang==="no"?"nb-NO":lang==="sv"?"sv-SE":lang==="nl"?"nl-NL":"fr-FR")}</div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── VUE LISTE ── */}
+      {viewMode === "list" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {loadingData ? <div style={LT}>{t("loading",lang)}</div> :
+            filtered.length===0 ? <div style={{ padding:40, textAlign:"center", color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif" }}>{t("no_prospects",lang)}</div> :
+            filtered.map(c=>(
+              <div key={c.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"13px 15px", background:"#fff", borderRadius:12, cursor:"pointer", boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }} onClick={()=>onSelect(c)}>
+                <div style={AV}>{c.first_name[0]}{c.last_name[0]}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:"#1A1A1A" }}>{c.first_name} {c.last_name}</div>
+                  <div style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.role}{c.company?` · ${c.company}`:""}</div>
+                  {profile?.role==="manager" && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>👤 {c.profiles?.full_name}</div>}
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4, flexShrink:0 }}>
+                  <div style={{ ...SB, background:STATUS_COLORS[c.status]?.bg, color:STATUS_COLORS[c.status]?.text }}>{STATUS_COLORS[c.status]?.label}</div>
+                  <div style={{ fontSize:10, color:"#bbb", fontFamily:"'Helvetica Neue',sans-serif" }}>{new Date(c.created_at).toLocaleDateString()}</div>
+                </div>
               </div>
-            </div>
-          ))
-        }
-      </div>
+            ))
+          }
+        </div>
+      )}
     </div>
   );
 }
@@ -2601,6 +2689,253 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
     </div>
   );
 }
+
+function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
+  const [period, setPeriod]       = useState("month");  // "week" | "month"
+  const [showObjForm, setShowObjForm] = useState(false);
+  const [objectives, setObjectives]   = useState(() => {
+    try { return JSON.parse(localStorage.getItem("prospeo_objectives") || "{}"); }
+    catch { return {}; }
+  });
+  const [objForm, setObjForm]     = useState({ monthly:"", quarterly:"", annual:"" });
+  const [savingObj, setSavingObj] = useState(false);
+
+  const STATUS_COLORS = getStatusColors(lang);
+
+  // ── Period filter ──
+  const now = new Date();
+  const filtered = contacts.filter(c => {
+    const d = new Date(c.created_at);
+    if (period === "week") {
+      const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+      return d >= weekAgo;
+    } else {
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }
+  });
+
+  // ── Stats globales ──
+  const stats = {
+    total:    filtered.length,
+    froid:    filtered.filter(c=>c.status==="froid").length,
+    tiede:    filtered.filter(c=>c.status==="tiede").length,
+    chaud:    filtered.filter(c=>c.status==="chaud").length,
+    converti: filtered.filter(c=>c.status==="converti").length,
+  };
+  const convRate = stats.total > 0 ? Math.round((stats.converti/stats.total)*100) : 0;
+
+  // ── Objectif courant ──
+  const monthKey = `${now.getFullYear()}-${now.getMonth()+1}`;
+  const quarterKey = `${now.getFullYear()}-Q${Math.ceil((now.getMonth()+1)/3)}`;
+  const yearKey = `${now.getFullYear()}`;
+  const objMonth   = parseInt(objectives[`monthly-${monthKey}`]   || objectives["monthly"]   || 0);
+  const objQuarter = parseInt(objectives[`quarterly-${quarterKey}`] || objectives["quarterly"] || 0);
+  const objAnnual  = parseInt(objectives[`annual-${yearKey}`]     || objectives["annual"]    || 0);
+
+  // All-time for annual
+  const annualTotal = contacts.filter(c => new Date(c.created_at).getFullYear() === now.getFullYear()).length;
+  // Quarter total
+  const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth()/3)*3, 1);
+  const quarterTotal = contacts.filter(c => new Date(c.created_at) >= qStart).length;
+
+  // ── Stats par commercial ──
+  const byRep = {};
+  contacts.filter(c => {
+    const d = new Date(c.created_at);
+    if (period === "week") { const w = new Date(now); w.setDate(now.getDate()-7); return d>=w; }
+    return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+  }).forEach(c => {
+    const name = displayName(c.profiles) || "—";
+    if (!byRep[name]) byRep[name] = { total:0, froid:0, tiede:0, chaud:0, converti:0 };
+    byRep[name].total++;
+    byRep[name][c.status] = (byRep[name][c.status]||0) + 1;
+  });
+  const repList = Object.entries(byRep).sort((a,b)=>b[1].total-a[1].total);
+
+  const saveObjectives = () => {
+    setSavingObj(true);
+    const newObj = {
+      ...objectives,
+      [`monthly-${monthKey}`]:     objForm.monthly   || objectives[`monthly-${monthKey}`]   || "",
+      [`quarterly-${quarterKey}`]: objForm.quarterly || objectives[`quarterly-${quarterKey}`] || "",
+      [`annual-${yearKey}`]:       objForm.annual    || objectives[`annual-${yearKey}`]     || "",
+      monthly:   objForm.monthly   || objectives["monthly"]   || "",
+      quarterly: objForm.quarterly || objectives["quarterly"] || "",
+      annual:    objForm.annual    || objectives["annual"]    || "",
+    };
+    setObjectives(newObj);
+    localStorage.setItem("prospeo_objectives", JSON.stringify(newObj));
+    setObjForm({ monthly:"", quarterly:"", annual:"" });
+    setShowObjForm(false);
+    notify(t("mgr_obj_saved",lang));
+    setSavingObj(false);
+  };
+
+  const ProgressBar = ({ value, target, color="#FF4C1A" }) => {
+    const pct = target > 0 ? Math.min(100, Math.round((value/target)*100)) : 0;
+    return (
+      <div>
+        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+          <span style={{ fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>{value} / {target || "—"}</span>
+          <span style={{ fontSize:12, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", color:pct>=100?"#00C48C":color }}>{target>0?pct+"%":"—"}</span>
+        </div>
+        <div style={{ height:8, background:"#F0EBE0", borderRadius:4, overflow:"hidden" }}>
+          <div style={{ height:"100%", width:`${pct}%`, background:pct>=100?"#00C48C":color, borderRadius:4, transition:"width 0.5s" }} />
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={P(isMobile)}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20, flexWrap:"wrap", gap:10 }}>
+        <div>
+          <h1 style={T(isMobile)}>🎯 {t("mgr_title",lang)}</h1>
+          <p style={Sub}>{t("mgr_per_rep",lang)}</p>
+        </div>
+        <button style={{ ...BP, fontSize:12, padding:"8px 14px" }} onClick={()=>{ setObjForm({ monthly: String(objMonth||""), quarterly: String(objQuarter||""), annual: String(objAnnual||"") }); setShowObjForm(!showObjForm); }}>
+          🎯 {t("mgr_set_obj",lang)}
+        </button>
+      </div>
+
+      {/* ── Formulaire objectifs ── */}
+      {showObjForm && (
+        <div style={{ ...C, marginBottom:16, border:"2px solid #FF4C1A" }}>
+          <h3 style={CT}>{t("mgr_set_obj",lang)}</h3>
+          <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr 1fr", gap:12, marginBottom:14 }}>
+            {[
+              { key:"monthly",   label:t("mgr_monthly",lang),   ph:"ex: 30" },
+              { key:"quarterly", label:t("mgr_quarterly",lang), ph:"ex: 90" },
+              { key:"annual",    label:t("mgr_annual",lang),    ph:"ex: 360" },
+            ].map(f=>(
+              <div key={f.key}>
+                <label style={L}>{f.label}</label>
+                <input style={I} type="number" min="0" placeholder={f.ph}
+                  value={objForm[f.key]}
+                  onChange={e=>setObjForm(p=>({...p,[f.key]:e.target.value}))} />
+              </div>
+            ))}
+          </div>
+          <div style={{ display:"flex", gap:10 }}>
+            <button style={{ ...BS, flex:1 }} onClick={()=>setShowObjForm(false)}>{t("cancel",lang)}</button>
+            <button style={{ ...BP, flex:1 }} onClick={saveObjectives} disabled={savingObj}>{t("mgr_save_obj",lang)}</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Sélecteur période ── */}
+      <div style={{ display:"flex", gap:6, marginBottom:16 }}>
+        {[["week", t("mgr_period_week",lang)], ["month", t("mgr_period_month",lang)]].map(([id,label])=>(
+          <button key={id} style={{ padding:"7px 16px", border:`2px solid ${period===id?"#1A1A1A":"#E8E0D4"}`, borderRadius:20, background:period===id?"#1A1A1A":"transparent", color:period===id?"#E8E0D4":"#888", cursor:"pointer", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
+            onClick={()=>setPeriod(id)}>{label}</button>
+        ))}
+      </div>
+
+      {/* ── KPIs globaux ── */}
+      <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(5,1fr)", gap:10, marginBottom:16 }}>
+        {[
+          { label:t("mgr_prospects_added",lang), value:stats.total,    bg:"#1A1A1A", fg:"#E8E0D4" },
+          { label:STATUS_COLORS.froid?.label,    value:stats.froid,    bg:STATUS_COLORS.froid?.bg,    fg:STATUS_COLORS.froid?.text    },
+          { label:STATUS_COLORS.tiede?.label,    value:stats.tiede,    bg:STATUS_COLORS.tiede?.bg,    fg:STATUS_COLORS.tiede?.text    },
+          { label:STATUS_COLORS.chaud?.label,    value:stats.chaud,    bg:STATUS_COLORS.chaud?.bg,    fg:STATUS_COLORS.chaud?.text    },
+          { label:STATUS_COLORS.converti?.label, value:stats.converti, bg:STATUS_COLORS.converti?.bg, fg:STATUS_COLORS.converti?.text },
+        ].map(k=>(
+          <div key={k.label} style={{ background:k.bg, borderRadius:12, padding:14 }}>
+            <div style={{ fontSize:28, fontWeight:700, color:k.fg, lineHeight:1 }}>{k.value}</div>
+            <div style={{ fontSize:10, color:k.fg, opacity:0.8, fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5, marginTop:4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Objectifs & Progression ── */}
+      <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr 1fr", gap:12, marginBottom:16 }}>
+        {[
+          { label:t("mgr_monthly",lang),   value:stats.total,    target:objMonth,   note:`${now.toLocaleDateString("fr-FR",{month:"long"})}` },
+          { label:t("mgr_quarterly",lang), value:quarterTotal,   target:objQuarter, note:`Q${Math.ceil((now.getMonth()+1)/3)} ${now.getFullYear()}` },
+          { label:t("mgr_annual",lang),    value:annualTotal,    target:objAnnual,  note:`${now.getFullYear()}` },
+        ].map(obj=>(
+          <div key={obj.label} style={C}>
+            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10 }}>
+              <div>
+                <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:1, fontWeight:600 }}>{obj.label}</div>
+                <div style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif" }}>{obj.note}</div>
+              </div>
+              <div style={{ fontSize:22, fontWeight:700, color:"#1A1A1A" }}>{obj.value}</div>
+            </div>
+            <ProgressBar value={obj.value} target={obj.target} />
+            {!obj.target && (
+              <div style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", marginTop:6, fontStyle:"italic" }}>
+                {t("mgr_set_obj",lang)} →
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* ── Taux de conversion ── */}
+      <div style={{ ...C, marginBottom:16 }}>
+        <h3 style={CT}>{t("mgr_conversion",lang)}</h3>
+        <div style={{ display:"flex", alignItems:"center", gap:20 }}>
+          <div style={{ width:80, height:80, borderRadius:"50%", background:`conic-gradient(#00C48C ${convRate*3.6}deg, #F0EBE0 0deg)`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+            <div style={{ width:56, height:56, borderRadius:"50%", background:"#fff", display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <span style={{ fontSize:16, fontWeight:700, color:"#1A1A1A" }}>{convRate}%</span>
+            </div>
+          </div>
+          <div style={{ flex:1 }}>
+            {["froid","tiede","chaud","converti"].map(st=>(
+              <div key={st} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                <div style={{ width:8, height:8, borderRadius:"50%", background:STATUS_COLORS[st]?.bg, flexShrink:0 }} />
+                <div style={{ flex:1, fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>{STATUS_COLORS[st]?.label}</div>
+                <div style={{ fontSize:13, fontWeight:700, color:"#1A1A1A" }}>{stats[st]}</div>
+                <div style={{ width:80, height:5, background:"#F0EBE0", borderRadius:3, overflow:"hidden" }}>
+                  <div style={{ height:"100%", width:`${stats.total>0?Math.round((stats[st]/stats.total)*100):0}%`, background:STATUS_COLORS[st]?.bg }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Comparatif par commercial ── */}
+      <div style={C}>
+        <h3 style={CT}>{t("mgr_per_rep",lang)}</h3>
+        {repList.length === 0 ? (
+          <div style={LT}>{t("no_prospects",lang)}</div>
+        ) : (
+          <div>
+            {repList.map(([name, s]) => {
+              const repConv = s.total > 0 ? Math.round((s.converti/s.total)*100) : 0;
+              return (
+                <div key={name} style={{ padding:"12px 0", borderBottom:"1px solid #F0EBE0" }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                    <div style={{ fontSize:14, fontWeight:600, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>{name}</div>
+                    <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                      <span style={{ fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#888" }}>{s.total} prospects</span>
+                      <span style={{ fontSize:11, fontWeight:700, color:"#00C48C", background:"#EBF8F4", padding:"2px 8px", borderRadius:20, fontFamily:"'Helvetica Neue',sans-serif" }}>{repConv}% {t("mgr_conversion",lang)}</span>
+                    </div>
+                  </div>
+                  <div style={{ display:"flex", gap:4, height:8, borderRadius:4, overflow:"hidden" }}>
+                    {["froid","tiede","chaud","converti"].map(st=>(
+                      s[st] > 0 && <div key={st} style={{ flex:s[st], background:STATUS_COLORS[st]?.bg }} title={`${STATUS_COLORS[st]?.label}: ${s[st]}`} />
+                    ))}
+                  </div>
+                  <div style={{ display:"flex", gap:12, marginTop:6 }}>
+                    {["froid","tiede","chaud","converti"].filter(st=>s[st]>0).map(st=>(
+                      <span key={st} style={{ fontSize:10, fontFamily:"'Helvetica Neue',sans-serif", color:STATUS_COLORS[st]?.bg }}>
+                        {STATUS_COLORS[st]?.label}: {s[st]}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );ac
+}
+
 
 function ExpiredWall({ profile, subscription, isMobile, lang="fr", onActivate }) {
   const [key, setKey]         = useState("");
