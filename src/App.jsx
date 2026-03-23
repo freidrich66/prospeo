@@ -287,7 +287,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
     { id:"list",          icon:"≡", label:t("nav_prospects",lang)     },
     { id:"report",        icon:"◉", label:t("nav_reports",lang)       },
     { id:"profile",       icon:"👤", label:t("nav_profile",lang)      },
-    ...(isSuperManager(profile) || profile?.crm_enabled ? [{ id:"crm", icon:"🔗", label:t("nav_crm",lang) }] : []),
+    { id:"crm", icon:"🔗", label:t("nav_crm",lang) },
     ...(profile?.role !== "manager" ? [{ id:"subscription", icon:"⭐", label:t("nav_subscription",lang) }] : []),
     ...(isSuperManager(profile) ? [{ id:"superadmin", icon:"🔐", label:t("nav_superadmin",lang) }] : []),
   ];
@@ -1766,8 +1766,8 @@ function CRMLockedView({ isMobile, lang="fr" }) {
 }
 
 function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
-  // CRM is a paid add-on — only show if super manager or crm_enabled
-  if (!isSuperManager(profile)) {
+  // Show devis page if CRM not enabled (but still accessible to all)
+  if (!isSuperManager(profile) && !profile?.crm_enabled) {
     return (
       <div style={P(isMobile)}>
         <h1 style={T(isMobile)}>{t("crm_title",lang)}</h1>
