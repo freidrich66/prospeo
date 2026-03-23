@@ -1741,15 +1741,15 @@ function CRMLockedView({ isMobile, lang="fr" }) {
       <div style={{ ...C, textAlign:"center", padding:40 }}>
         <div style={{ fontSize:48, marginBottom:16 }}>🔒</div>
         <h2 style={{ fontSize:20, fontWeight:600, color:"#1A1A1A", fontFamily:"Georgia,serif", margin:"0 0 12px" }}>
-          Option CRM — Sur devis
+          {t("crm_locked_title",lang)}
         </h2>
         <p style={{ fontSize:14, color:"#666", fontFamily:"'Helvetica Neue',sans-serif", lineHeight:1.7, margin:"0 0 24px", maxWidth:400, marginLeft:"auto", marginRight:"auto" }}>
-          L'intégration CRM est une option payante disponible sur devis. Elle permet de synchroniser automatiquement vos prospects avec HubSpot, Salesforce, Pipedrive, Zoho et Odoo.
+          {t("crm_locked_desc",lang)}
         </p>
         <div style={{ background:"#F5F0E8", borderRadius:12, padding:20, marginBottom:24, display:"inline-block", textAlign:"left", minWidth:280 }}>
           <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:1, marginBottom:12, fontWeight:600 }}>{t("sub_title",lang)}</div>
           <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
-            <span style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>Prospeo</span>
+            <span style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>{t("crm_base_plan",lang)}</span>
             <span style={{ fontSize:13, fontWeight:700, color:"#1A1A1A" }}>4,99€ HT/mois</span>
           </div>
           <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
@@ -1758,14 +1758,14 @@ function CRMLockedView({ isMobile, lang="fr" }) {
           </div>
           <div style={{ borderTop:"1px solid #E8E0D4", marginTop:8, paddingTop:8, display:"flex", justifyContent:"space-between" }}>
             <span style={{ fontSize:13, color:"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>{t("crm_title",lang)}</span>
-            <span style={{ fontSize:13, fontWeight:700, color:"#888" }}>On quote</span>
+            <span style={{ fontSize:13, fontWeight:700, color:"#888" }}>{t("crm_on_quote",lang)}</span>
           </div>
         </div>
         <p style={{ fontSize:12, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", margin:"0 0 20px" }}>
-          Contactez votre administrateur Prospeo pour activer cette option.
+          {t("crm_contact_admin",lang)}
         </p>
         <a href="mailto:contact@prospeo.me" style={{ display:"inline-block", padding:"12px 24px", background:"#1A1A1A", color:"#E8E0D4", borderRadius:10, fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, textDecoration:"none" }}>
-          📧 Demander un devis
+          {t("crm_request_quote",lang)}
         </a>
       </div>
     </div>
@@ -1781,10 +1781,10 @@ function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
         <div style={{ ...C, textAlign:"center", padding:40 }}>
           <div style={{ fontSize:48, marginBottom:16 }}>🔗</div>
           <h2 style={{ fontSize:20, fontWeight:600, color:"#1A1A1A", fontFamily:"Georgia,serif", margin:"0 0 12px" }}>
-            Option CRM
+            {t("crm_locked_title",lang)}
           </h2>
           <p style={{ fontSize:14, color:"#666", fontFamily:"'Helvetica Neue',sans-serif", lineHeight:1.7, margin:"0 0 24px", maxWidth:400, marginLeft:"auto", marginRight:"auto" }}>
-            L'intégration CRM est une option payante disponible sur demande. Elle permet de synchroniser automatiquement vos prospects avec HubSpot, Salesforce, Pipedrive, Zoho et Odoo.
+            {t("crm_locked_desc",lang)}
           </p>
           <div style={{ background:"#F5F0E8", borderRadius:12, padding:20, marginBottom:24, display:"inline-block", textAlign:"left" }}>
             <div style={{ fontSize:13, fontWeight:700, color:"#1A1A1A", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:10 }}>{t("sub_title",lang)}</div>
@@ -1798,7 +1798,7 @@ function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
           <div>
             <a href="mailto:contact@prospeo.me?subject=Demande option CRM&body=Bonjour, je souhaite activer l'option CRM pour mon compte Prospeo."
               style={{ display:"inline-block", padding:"12px 28px", background:"#FF4C1A", color:"#fff", borderRadius:10, textDecoration:"none", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:700 }}>
-              📧 Demander un devis CRM
+              {t("crm_request_quote",lang)}
             </a>
           </div>
           <p style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", marginTop:16 }}>
