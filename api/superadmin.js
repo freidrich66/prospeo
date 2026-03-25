@@ -46,7 +46,8 @@ export default async function handler(req, res) {
 
     // ── GENERATE KEYS MANUALLY ──────────────────────────────
     if (action === "generateKeys") {
-      const { quantity = 1, email, companyName, notes, trialDays = 0 } = req.body;
+      const { quantity = 1, email, companyName, notes, trialDays = 0, commercialEmails = [] } = req.body;
+      // commercialEmails = array of emails for each commercial slot (optional)
       const qty      = Math.max(1, parseInt(quantity));
       const batchId  = crypto.randomUUID();
       const expiresAt = new Date();
@@ -76,10 +77,11 @@ export default async function handler(req, res) {
           notes: (notes || `Pack ${qty} licences — Licence Manager`) + trialSuffix,
           expires_at: expiresAt.toISOString(),
         });
-        // Commercial keys
+        // Commercial keys — with optional pre-assigned emails
         for (let i = 1; i < qty; i++) {
+          const commEmail = commercialEmails[i-1] || null;
           keysToInsert.push({
-            key: genKey(), email: null,
+            key: genKey(), email: commEmail,
             key_type: "commercial", plan: keyPlan,
             batch_id: batchId,
             notes: (notes || `Pack ${qty} licences — Licence Commercial ${i}`) + trialSuffix,
@@ -101,10 +103,87 @@ export default async function handler(req, res) {
 
       if (error) return res.status(500).json({ error: error.message });
 
+      // ── Send emails ──
+      // 1. Send manager key to manager email
+      // 2. Send each commercial key to pre-assigned email (if provided)
+      // 3. Send all keys summary to manager + BCC synermo
+      let emailSent = false;
+      if (process.env.RESEND_API_KEY) {
+        const managerKey     = data.find(k => k.key_type === "manager" || k.key_type === "individual");
+        const commercialKeys = data.filter(k => k.key_type === "commercial");
+        const expireStr      = expiresAt.toLocaleDateString("fr-FR");
+        const trialNote      = trialDays > 0 ? ` (essai ${trialDays} jours)` : "";
+
+        const sendEmail = async (to, subject, html, bcc = ["contact@synermo.fr"]) => {
+          const r = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${process.env.RESEND_API_KEY}` },
+            body: JSON.stringify({ from: "Prospeo <contact@prospeo.me>", to, bcc, subject, html }),
+          });
+          return r.ok;
+        };
+
+        try {
+          // ── 1. Email au manager : toutes les clés ──
+          if (email) {
+            const keyLines = [
+              managerKey ? `🔑 <strong>Clé Manager :</strong> <code style="background:#fff;padding:2px 8px;border-radius:4px">${managerKey.key}</code>` : "",
+              ...commercialKeys.map((k,i) => {
+                const assignedTo = k.email ? ` → <em>${k.email}</em>` : "";
+                return `🔑 <strong>Clé Commercial ${i+1} :</strong> <code style="background:#fff;padding:2px 8px;border-radius:4px">${k.key}</code>${assignedTo}`;
+              }),
+            ].filter(Boolean).join("<br><br>");
+
+            const ok = await sendEmail(
+              [email],
+              `🔑 Vos clés d'activation Prospeo${trialNote} — Pack ${qty} licences`,
+              `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
+                <h2 style="color:#FF4C1A">◈ Prospeo — Vos clés d'activation</h2>
+                <p>Bonjour,</p>
+                <p>Voici votre pack de <strong>${qty} licences</strong>${trialNote} :</p>
+                <div style="background:#F5F0E8;border-radius:10px;padding:16px;margin:16px 0;line-height:2">
+                  ${keyLines}
+                </div>
+                <p>📌 Activez votre licence Manager sur <a href="https://prospeo.me">prospeo.me</a> → onglet Abonnement.</p>
+                <p>Partagez les clés Commerciaux à vos collaborateurs. Ils devront s'inscrire sur prospeo.me et entrer leur clé.</p>
+                <p style="color:#888;font-size:12px">Expire le : ${expireStr}</p>
+              </div>`
+            );
+            if (ok) emailSent = true;
+          }
+
+          // ── 2. Email individuel à chaque commercial pré-assigné ──
+          for (const commKey of commercialKeys) {
+            if (commKey.email) {
+              await sendEmail(
+                [commKey.email],
+                `🔑 Votre licence Prospeo${trialNote} — Clé d'activation`,
+                `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px">
+                  <h2 style="color:#FF4C1A">◈ Prospeo — Votre licence</h2>
+                  <p>Bonjour,</p>
+                  <p>Votre manager vous a attribué une licence Prospeo${trialNote}. Voici votre clé d'activation :</p>
+                  <div style="background:#F5F0E8;border-radius:10px;padding:20px;margin:16px 0;font-family:monospace;font-size:18px;text-align:center;letter-spacing:2px">
+                    <strong>${commKey.key}</strong>
+                  </div>
+                  <p>👉 Inscrivez-vous sur <a href="https://prospeo.me">prospeo.me</a> puis entrez cette clé dans l'onglet <strong>Abonnement</strong>.</p>
+                  <p style="color:#888;font-size:12px">Expire le : ${expireStr}</p>
+                </div>`
+              );
+              await supabase.from("activation_keys").update({ email_sent: true }).eq("id", commKey.id);
+            }
+          }
+
+          if (emailSent) {
+            await supabase.from("activation_keys").update({ email_sent: true }).eq("batch_id", data[0]?.batch_id);
+          }
+        } catch(e) { console.error("Email error:", e); }
+      }
+
       return res.status(200).json({
         success: true,
         keys: data.map(k => ({ key: k.key, type: k.key_type, batch: k.batch_id })),
-        message: `${qty} clé(s) générée(s) avec succès`,
+        emailSent,
+        message: `${qty} clé(s) générée(s)${emailSent ? " · email envoyé ✉️" : ""}`,
       });
     }
 
