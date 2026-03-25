@@ -114,12 +114,23 @@ export default async function handler(req, res) {
         const expireStr      = expiresAt.toLocaleDateString("fr-FR");
         const trialNote      = trialDays > 0 ? ` (essai ${trialDays} jours)` : "";
 
+        // Domaine expéditeur : utilise prospeo.me si vérifié dans Resend, sinon onboarding@resend.dev
+        const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Prospeo <onboarding@resend.dev>";
         const sendEmail = async (to, subject, html, bcc = ["contact@synermo.fr"]) => {
+          const payload = { from: FROM_EMAIL, to, subject, html };
+          // BCC only if domain is custom (resend.dev doesn't support bcc)
+          if (!FROM_EMAIL.includes("resend.dev")) payload.bcc = bcc;
           const r = await fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${process.env.RESEND_API_KEY}` },
-            body: JSON.stringify({ from: "Prospeo <contact@prospeo.me>", to, bcc, subject, html }),
+            body: JSON.stringify(payload),
           });
+          const respText = await r.text();
+          if (!r.ok) {
+            console.error(`❌ Resend error ${r.status}:`, respText);
+          } else {
+            console.log(`✅ Email envoyé à ${to}:`, respText);
+          }
           return r.ok;
         };
 
