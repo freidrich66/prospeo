@@ -183,7 +183,10 @@ export default async function handler(req, res) {
           }
 
           if (emailSent) {
-            await supabase.from("activation_keys").update({ email_sent: true }).eq("batch_id", data[0]?.batch_id);
+            // Mark ALL keys in this batch as email_sent
+            await supabase.from("activation_keys")
+              .update({ email_sent: true })
+              .in("id", data.map(k => k.id));
           }
         } catch(e) { console.error("Email error:", e); }
       }
