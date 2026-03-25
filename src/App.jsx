@@ -2937,6 +2937,8 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
                           </select>
                         </div>
                       )}
+                      {/* Role selector */}
+                      <div style={{ marginTop:6, display:"flex", alignItems:"center", gap:6 }}>
                         <span style={{ fontSize:10, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>Rôle :</span>
                         <select style={{ fontSize:11, padding:"3px 6px", borderRadius:6, border:"1.5px solid #E8E0D4", fontFamily:"'Helvetica Neue',sans-serif", cursor:"pointer", background:"#fff" }}
                           value={p.role||"commercial"}
