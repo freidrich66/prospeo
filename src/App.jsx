@@ -2467,7 +2467,11 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
     if (res.success) {
       setNewKeys(res.keys);
       notify(`✅ ${res.message}`);
-      call("getData").then(d => setData(d ? {...d, keys: (d.keys||[]).filter(k => !deletedKeyIds.has(k.id))} : d));
+      // Recharge les données en filtrant les clés supprimées localement
+      // et en attendant un court délai pour que Supabase ait le temps de mettre à jour email_sent
+      setTimeout(() => {
+        call("getData").then(d => setData(d ? {...d, keys: (d.keys||[]).filter(k => !deletedKeyIds.has(k.id))} : d));
+      }, 1500);
     } else {
       notify(res.error || "Erreur", "error");
     }
@@ -3147,7 +3151,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
                 <div style={{ fontSize:10, color:"#BBBBBB", fontFamily:"'Helvetica Neue',sans-serif", marginTop:2, paddingLeft:52 }}>
                   {k.email || "—"} · expire {new Date(k.expires_at).toLocaleDateString()}
                   {k.email_sent && <span style={{ color:"#00C48C", marginLeft:6 }}>✉️ envoyé</span>}
-                  {k.email && !k.email_sent && <span style={{ color:"#FF9500", marginLeft:6 }}>⚠️ email non envoyé</span>}
+                  {k.email && !k.email_sent && !k.used && <span style={{ color:"#FF9500", marginLeft:6 }}>⚠️ email non envoyé</span>}
                 </div>
               </div>
             );
