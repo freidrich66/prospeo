@@ -107,6 +107,23 @@ function isSuperManager(profile) {
   return profile?.email === SUPER_EMAIL;
 }
 
+// Rôles avec droits manager (vue équipe + objectifs)
+const MANAGER_ROLES = ["manager","sector_manager","director"];
+
+function isManager(profile) {
+  return MANAGER_ROLES.includes(profile?.role);
+}
+
+function getRoleLabel(role, lang="fr") {
+  const labels = {
+    commercial:     { fr:"Commercial",          en:"Sales rep"        },
+    manager:        { fr:"Manager",             en:"Manager"          },
+    sector_manager: { fr:"Manager de secteur",  en:"Sector manager"   },
+    director:       { fr:"Directeur Commercial",en:"Sales Director"   },
+  };
+  return labels[role]?.[lang] || role;
+}
+
 function displayName(p, lang="fr") {
   if (!p) return "—";
   if (p.first_name && p.last_name) return `${p.first_name} ${p.last_name}`;
@@ -282,7 +299,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
   const loadContacts = useCallback(async () => {
     setLoadingData(true);
     let q = supabase.from("contacts").select("*, profiles:user_id(full_name,email)").order("created_at",{ascending:false});
-    if (profile?.role !== "manager") q = q.eq("user_id", profile?.id);
+    if (!isManager(profile)) q = q.eq("user_id", profile?.id);
     const { data } = await q;
     setContacts(data || []);
     setLoadingData(false);
@@ -317,8 +334,8 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
     { id:"report",        icon:"◉", label:t("nav_reports",lang)       },
     { id:"profile",       icon:"👤", label:t("nav_profile",lang)      },
     { id:"crm", icon:"🔗", label:t("nav_crm",lang) },
-    ...(profile?.role === "manager" ? [{ id:"mgrdashboard", icon:"🎯", label:t("nav_mgr",lang) }] : []),
-    ...(profile?.role !== "manager" ? [{ id:"subscription", icon:"⭐", label:t("nav_subscription",lang) }] : []),
+    ...(isManager(profile) ? [{ id:"mgrdashboard", icon:"🎯", label:t("nav_mgr",lang) }] : []),
+    ...(!isManager(profile) ? [{ id:"subscription", icon:"⭐", label:t("nav_subscription",lang) }] : []),
     ...(isSuperManager(profile) ? [{ id:"superadmin", icon:"🔐", label:t("nav_superadmin",lang) }] : []),
   ];
 
@@ -351,7 +368,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
             <div style={{ width:34, height:34, borderRadius:"50%", background:"#FF4C1A", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", flexShrink:0 }}>{profile?.full_name?.[0]||"?"}</div>
             <div>
               <div style={{ fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#E8E0D4", fontWeight:600, maxWidth:140, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{displayName(profile)}</div>
-              <div style={{ fontSize:10, color:profile?.role==="manager"?"#FF4C1A":"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{profile?.role==="manager"?"👑 Manager":t("commercial_label",lang)}</div>
+              <div style={{ fontSize:10, color:isManager(profile)?"#FF4C1A":"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{isManager(profile)?"👑 " + getRoleLabel(profile?.role, lang):t("commercial_label",lang)}</div>
             </div>
           </div>
           <nav style={{ flex:1, display:"flex", flexDirection:"column", gap:2, padding:"0 12px" }}>
@@ -383,7 +400,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
             <span style={{ fontSize:15, fontWeight:700, letterSpacing:3, color:"#E8E0D4", fontFamily:"'Helvetica Neue',sans-serif" }}>PROSPEO</span>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <span style={{ fontSize:11, color:profile?.role==="manager"?"#FF4C1A":"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{profile?.role==="manager"?"👑 ":""}{profile?.first_name || profile?.full_name?.split(" ")[0] || profile?.email?.split("@")[0]}</span>
+            <span style={{ fontSize:11, color:isManager(profile)?"#FF4C1A":"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{isManager(profile)?"👑 ":""}{profile?.first_name || profile?.full_name?.split(" ")[0] || profile?.email?.split("@")[0]}</span>
             <button style={{ background:"transparent", border:"none", color:"#888", cursor:"pointer", fontSize:18, padding:"4px 6px" }} onClick={onSignOut}>⎋</button>
           </div>
         </div>
@@ -400,7 +417,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
         {view==="subscription"  && <SubscriptionView profile={profile} subscription={subscription} isMobile={isMobile} lang={lang} notify={notify} onActivated={loadSubscription} />}
         {view==="activate"      && <ActivateKeyView profile={profile} isMobile={isMobile} lang={lang} notify={notify} onActivated={()=>{ loadSubscription(); setView("dashboard"); }} />}
         {view==="superadmin" && isSuperManager(profile) && <SuperAdminView profile={profile} isMobile={isMobile} lang={lang} notify={notify} />}
-        {view==="mgrdashboard" && profile?.role === "manager" && <MgrDashboardView contacts={contacts} profile={profile} isMobile={isMobile} lang={lang} notify={notify} />}
+        {view==="mgrdashboard" && isManager(profile) && <MgrDashboardView contacts={contacts} profile={profile} isMobile={isMobile} lang={lang} notify={notify} />}
         {view==="crm"         && (
           isSuperManager(profile) || profile?.crm_enabled
             ? <CRMConfigView profile={profile} isMobile={isMobile} lang={lang} notify={notify} />
@@ -431,7 +448,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
         <p style={Sub}>{new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</p>
       </div>
 
-      {profile?.role !== "manager" && subscription && subscription.status !== "lifetime" && !(subscription.current_period_end && new Date(subscription.current_period_end) > new Date("2099-01-01")) && (() => {
+      {!isManager(profile) && subscription && subscription.status !== "lifetime" && !(subscription.current_period_end && new Date(subscription.current_period_end) > new Date("2099-01-01")) && (() => {
         const now = new Date();
         const trialEnd = subscription.trial_ends_at ? new Date(subscription.trial_ends_at) : null;
         const daysLeft = trialEnd ? Math.ceil((trialEnd - now) / 86400000) : 0;
@@ -526,7 +543,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
                         <div style={{ flex:1 }}>
                           <div style={{ fontSize:14, fontWeight:600, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>{c.first_name} {c.last_name}</div>
                           <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{c.company||"—"} · {c.email||c.phone||""}</div>
-                          {profile?.role==="manager" && c.profiles?.full_name && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>👤 {c.profiles.full_name}</div>}
+                          {isManager(profile) && c.profiles?.full_name && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>👤 {c.profiles.full_name}</div>}
                         </div>
                         <div style={{ ...SB, background:getStatusColors(lang||"fr")[c.status]?.bg, color:getStatusColors(lang||"fr")[c.status]?.text, flexShrink:0 }}>{getStatusColors(lang||"fr")[c.status]?.label}</div>
                       </div>
@@ -542,7 +559,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
                         <div style={{ flex:1, minWidth:0 }}>
                           <div style={{ fontSize:13, fontWeight:600, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.first_name} {c.last_name}</div>
                           <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.company||"—"} · {c.email||c.phone||""}</div>
-                          {profile?.role==="manager" && c.profiles?.full_name && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>👤 {c.profiles.full_name}</div>}
+                          {isManager(profile) && c.profiles?.full_name && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>👤 {c.profiles.full_name}</div>}
                         </div>
                         <div style={{ ...SB, background:getStatusColors(lang||"fr")[c.status]?.bg, color:getStatusColors(lang||"fr")[c.status]?.text, flexShrink:0 }}>{getStatusColors(lang||"fr")[c.status]?.label}</div>
                       </div>
@@ -564,7 +581,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:"#1A1A1A", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.first_name} {c.last_name}</div>
                 <div style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.company||c.role}</div>
-                {profile?.role==="manager" && (
+                {isManager(profile) && (
                   <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}>
                     👤 {displayName(c.profiles)}
                   </div>
@@ -575,7 +592,7 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
           ))
         }
       </div>
-      {profile?.role==="manager" && (
+      {isManager(profile) && (
         <div style={{ ...C, marginTop:14 }}>
           <h3 style={CT}>{t("by_sales_rep",lang)}</h3>
           {(() => {
@@ -681,7 +698,7 @@ function AddView({ profile, isMobile, notify, lang="fr", onAdded }) {
     if (!form.first_name||!form.last_name) { notify("First name and last name required","error"); return; }
 
     // Block if duplicate detected (except for managers who can override)
-    if (duplicate && profile?.role !== "manager") {
+    if (duplicate && !isManager(profile)) {
       notify("⚠️ " + t("duplicate_own",lang), "error");
       return;
     }
@@ -1114,7 +1131,7 @@ function ListView({ contacts, profile, loadingData, isMobile, lang="fr", onSelec
                       {statuses.map(st=>(
                         <div key={st} style={{ ...SB, background:STATUS_COLORS[st]?.bg, color:STATUS_COLORS[st]?.text, fontSize:9 }}>{STATUS_COLORS[st]?.label}</div>
                       ))}
-                      {profile?.role==="manager" && reps.length > 0 && (
+                      {isManager(profile) && reps.length > 0 && (
                         <span style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>{reps.slice(0,2).join(", ")}{reps.length>2?` +${reps.length-2}`:""}</span>
                       )}
                     </div>
@@ -1130,7 +1147,7 @@ function ListView({ contacts, profile, loadingData, isMobile, lang="fr", onSelec
                         <div style={{ flex:1, minWidth:0 }}>
                           <div style={{ fontSize:13, fontWeight:600, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>{c.first_name} {c.last_name}</div>
                           <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                            {c.role||"—"}{profile?.role==="manager" && c.profiles?.full_name ? <span style={{ color:"#FF4C1A" }}> · {c.profiles.full_name}</span> : ""}
+                            {c.role||"—"}{isManager(profile) && c.profiles?.full_name ? <span style={{ color:"#FF4C1A" }}> · {c.profiles.full_name}</span> : ""}
                           </div>
                         </div>
                         <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:3, flexShrink:0 }}>
@@ -1158,7 +1175,7 @@ function ListView({ contacts, profile, loadingData, isMobile, lang="fr", onSelec
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:"#1A1A1A" }}>{c.first_name} {c.last_name}</div>
                   <div style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.role}{c.company?` · ${c.company}`:""}</div>
-                  {profile?.role==="manager" && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>👤 {c.profiles?.full_name}</div>}
+                  {isManager(profile) && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>👤 {c.profiles?.full_name}</div>}
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4, flexShrink:0 }}>
                   <div style={{ ...SB, background:STATUS_COLORS[c.status]?.bg, color:STATUS_COLORS[c.status]?.text }}>{STATUS_COLORS[c.status]?.label}</div>
@@ -1342,7 +1359,7 @@ function DetailView({ contact:initialContact, profile, isMobile, lang="fr", onBa
           <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
             <div style={{ ...SB, background:getStatusColors(lang||"fr")[c.status]?.bg, color:getStatusColors(lang||"fr")[c.status]?.text }}>{getStatusColors(lang||"fr")[c.status]?.label}</div>
             <div style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", alignSelf:"center" }}>{SOURCE_ICONS[c.source]} {c.source}</div>
-            {profile?.role==="manager" && c.profiles?.full_name && (
+            {isManager(profile) && c.profiles?.full_name && (
           <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 10px", background:"#FFF4EE", borderRadius:20 }}>
             <span style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}>👤 {c.profiles.full_name}</span>
           </div>
@@ -1651,7 +1668,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
     );
     return matchPeriod && matchUser && matchSearch;
   });
-  const allUsers = profile?.role==="manager" ? [...new Set(contacts.map(c=>c.profiles?.full_name||c.profiles?.email||t("error",lang)))] : [];
+  const allUsers = isManager(profile) ? [...new Set(contacts.map(c=>c.profiles?.full_name||c.profiles?.email||t("error",lang)))] : [];
 
   const stats = {
     total:    filtered.length,
@@ -1711,7 +1728,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
         )}
       </div>
 
-      {profile?.role==="manager" && allUsers.length > 0 && (
+      {isManager(profile) && allUsers.length > 0 && (
         <div style={{ marginBottom:14 }}>
           <label style={L}>{t("filter_by_rep",lang)}</label>
           <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:6 }}>
@@ -1754,7 +1771,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, color:"#1A1A1A" }}>{c.first_name} {c.last_name}</div>
                 <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.company||"—"} · {new Date(c.created_at).toLocaleDateString(lang==="zh"?"zh-CN":lang==="de"?"de-DE":lang==="es"?"es-ES":lang==="pt"?"pt-PT":lang==="it"?"it-IT":lang==="no"?"nb-NO":lang==="sv"?"sv-SE":lang==="nl"?"nl-NL":"fr-FR")}</div>
-                {profile?.role==="manager" && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>{c.profiles?.full_name}</div>}
+                {isManager(profile) && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>{c.profiles?.full_name}</div>}
               </div>
               <div style={{ ...SB, background:getStatusColors(lang||"fr")[c.status]?.bg, color:getStatusColors(lang||"fr")[c.status]?.text, flexShrink:0 }}>{getStatusColors(lang||"fr")[c.status]?.label}</div>
             </div>
@@ -1918,8 +1935,8 @@ function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, onUpdat
           </div>
           <div style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>{profile?.email}</div>
           <div style={{ marginTop:6 }}>
-            <span style={{ fontSize:11, fontWeight:700, padding:"2px 10px", borderRadius:20, background: profile?.role==="manager"?"#FF4C1A":"#1A1A1A", color:"#fff", fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5 }}>
-              {profile?.role==="manager"?"👑 Manager":t("commercial_label",lang)}
+            <span style={{ fontSize:11, fontWeight:700, padding:"2px 10px", borderRadius:20, background: isManager(profile)?"#FF4C1A":"#1A1A1A", color:"#fff", fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5 }}>
+              {isManager(profile)?"👑 " + getRoleLabel(profile?.role, lang):t("commercial_label",lang)}
             </span>
           </div>
         </div>
@@ -2414,6 +2431,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
   const [genTrial, setGenTrial]   = useState("annual");
   const [genLoading, setGenLoading] = useState(false);
   const [newKeys, setNewKeys]     = useState([]);
+  const [commEmails, setCommEmails] = useState([]); // pre-assigned commercial emails
 
   // ── Ajouter licences à une entreprise existante ──
   const [addCompanyId, setAddCompanyId]   = useState("");
@@ -2443,6 +2461,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
       quantity: genQty, email: genEmail,
       companyName: genCompany, notes: genNotes,
       trialDays: genTrial === 'trial7' ? 7 : genTrial === 'trial14' ? 14 : 0,
+      commercialEmails: commEmails.filter(e=>e.trim()), // pre-assigned emails
     });
     if (res.success) {
       setNewKeys(res.keys);
@@ -2803,6 +2822,31 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
                     <input style={I} placeholder="Acme Corp" value={genCompany} onChange={e=>setGenCompany(e.target.value)} />
                   </div>
                 )}
+
+                {/* ── Emails commerciaux pré-assignés (optionnel) ── */}
+                {parseInt(genQty) > 1 && (
+                  <div style={{ gridColumn:"1/-1" }}>
+                    <label style={L}>Emails des commerciaux <span style={{ color:"#aaa", fontWeight:400 }}>(optionnel — ils recevront leur clé directement)</span></label>
+                    <div style={{ display:"flex", flexDirection:"column", gap:6, marginTop:6 }}>
+                      {Array.from({length: parseInt(genQty)-1}, (_, i) => (
+                        <div key={i} style={{ display:"flex", alignItems:"center", gap:8 }}>
+                          <span style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", width:80, flexShrink:0 }}>Commercial {i+1}</span>
+                          <input style={{ ...I, marginBottom:0, flex:1 }} type="email"
+                            placeholder={`commercial${i+1}@entreprise.fr`}
+                            value={commEmails[i]||""}
+                            onChange={e=>{
+                              const arr = [...commEmails];
+                              arr[i] = e.target.value;
+                              setCommEmails(arr);
+                            }} />
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ fontSize:10, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4 }}>
+                      Si renseigné, chaque commercial reçoit sa clé par email. Sinon, le manager distribue manuellement.
+                    </div>
+                  </div>
+                )}
                 <div>
                   <label style={L}>Type</label>
                   <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
@@ -2864,15 +2908,50 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
               <h3 style={CT}>{data.profiles?.length} utilisateurs</h3>
               {data.profiles?.filter(p => p.email !== "fanne@lafitel.eu").map(p => {
                 const sub = getSubForUser(p.id);
+                const isManagerRole = MANAGER_ROLES.includes(p.role);
                 return (
-                  <div key={p.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 0", borderBottom:"1px solid #F0EBE0" }}>
-                    <div style={{ width:36, height:36, borderRadius:"50%", background: p.role==="manager"?"#FF4C1A":"#1A1A1A", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", flexShrink:0 }}>
+                  <div key={p.id} style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"12px 0", borderBottom:"1px solid #F0EBE0" }}>
+                    <div style={{ width:36, height:36, borderRadius:"50%", background:isManagerRole?"#FF4C1A":"#1A1A1A", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", flexShrink:0 }}>
                       {(p.full_name||p.email)[0].toUpperCase()}
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontSize:13, fontWeight:600, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>{p.full_name||"—"}</div>
-                      <div style={{ fontSize:11, color:"#CCCCCC", fontFamily:"'Helvetica Neue',sans-serif" }}>{p.email} · {p.role}</div>
+                      <div style={{ fontSize:11, color:"#CCCCCC", fontFamily:"'Helvetica Neue',sans-serif" }}>{p.email}</div>
                       <div style={{ fontSize:11, color:statusColor(sub), fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}>{statusLabel(sub)}</div>
+                      {/* Manager assignment */}
+                      {p.role === "commercial" && (
+                        <div style={{ marginTop:4, display:"flex", alignItems:"center", gap:6 }}>
+                          <span style={{ fontSize:10, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>Manager :</span>
+                          <select style={{ fontSize:11, padding:"3px 6px", borderRadius:6, border:"1.5px solid #E8E0D4", fontFamily:"'Helvetica Neue',sans-serif", cursor:"pointer", background:"#fff" }}
+                            value={p.manager_id||""}
+                            onChange={async(e)=>{
+                              const mid = e.target.value || null;
+                              const {error} = await supabase.from("profiles").update({manager_id:mid}).eq("id",p.id);
+                              if(error) notify(t("error",lang),"error");
+                              else { notify("✅ Manager assigné"); call("getData").then(d=>setData(d)); }
+                            }}>
+                            <option value="">— Non assigné —</option>
+                            {data.profiles?.filter(m=>MANAGER_ROLES.includes(m.role)&&m.email!=="fanne@lafitel.eu").map(m=>(
+                              <option key={m.id} value={m.id}>{m.full_name||m.email}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                        <span style={{ fontSize:10, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>Rôle :</span>
+                        <select style={{ fontSize:11, padding:"3px 6px", borderRadius:6, border:"1.5px solid #E8E0D4", fontFamily:"'Helvetica Neue',sans-serif", cursor:"pointer", background:"#fff" }}
+                          value={p.role||"commercial"}
+                          onChange={async(e)=>{
+                            const newRole = e.target.value;
+                            const {error} = await supabase.from("profiles").update({role:newRole}).eq("id",p.id);
+                            if(error) notify(t("error",lang),"error");
+                            else { notify(`✅ Rôle mis à jour → ${getRoleLabel(newRole,lang)}`); call("getData").then(d=>setData(d)); }
+                          }}>
+                          <option value="commercial">Commercial</option>
+                          <option value="manager">Manager</option>
+                          <option value="sector_manager">Manager de secteur</option>
+                          <option value="director">Directeur Commercial</option>
+                        </select>
+                      </div>
                     </div>
                     <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
                       <button style={{ padding:"4px 8px", background:"#00C48C", color:"#fff", border:"none", borderRadius:5, cursor:"pointer", fontSize:10, fontFamily:"'Helvetica Neue',sans-serif" }}
@@ -2999,14 +3078,46 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
               {data.keys?.map(k => (
                 <div key={k.id} style={{ padding:"10px 0", borderBottom:"1px solid #F0EBE0" }}>
                   <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                    <div style={{ fontFamily:"'Courier New',monospace", fontSize:13, fontWeight:700, color: k.used ? "#aaa" : "#1A1A1A", flex:1, letterSpacing:1, textDecoration: k.used?"line-through":"none" }}>{k.key}</div>
-                    <div style={{ fontSize:10, padding:"2px 7px", borderRadius:10, background: k.used?"#F0EBE0":"#EBF8F4", color: k.used?"#888":"#00875A", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}>
-                      {k.used?"Utilisée":"Disponible"}
+                    <div style={{ fontFamily:"'Courier New',monospace", fontSize:13, fontWeight:700, color:k.used?"#aaa":"#1A1A1A", flex:1, letterSpacing:1, textDecoration:k.used?"line-through":"none" }}>{k.key}</div>
+                    <button style={{ border:"none", background:"transparent", cursor:"pointer", fontSize:14, padding:"2px 6px" }}
+                      onClick={()=>{ navigator.clipboard.writeText(k.key); notify(t("kpi_copied",lang)); }}>📋</button>
+                    <div style={{ fontSize:10, padding:"2px 7px", borderRadius:10, background:k.suspended?"#FFF0F0":k.used?"#F0EBE0":"#EBF8F4", color:k.suspended?"#FF2D2D":k.used?"#888":"#00875A", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}>
+                      {k.suspended?"🔒 Suspendue":k.used?t("kpi_used_keys",lang):"Disponible"}
                     </div>
+                    {!k.used && (
+                      <button style={{ border:"none", background:"#FFF0F0", color:"#FF2D2D", cursor:"pointer", fontSize:11, padding:"3px 8px", borderRadius:6, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
+                        onClick={async()=>{
+                          if(!confirm("Supprimer cette clé ?")) return;
+                          await supabase.from("activation_keys").delete().eq("id",k.id);
+                          notify("🗑 Clé supprimée");
+                          call("getData").then(d=>setData(d));
+                        }}>🗑</button>
+                    )}
+                    {k.used && (
+                      <button style={{ border:"none", background:k.suspended?"#EBF8F4":"#FFF8F0", color:k.suspended?"#00875A":"#FF9500", cursor:"pointer", fontSize:11, padding:"3px 8px", borderRadius:6, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
+                        title={k.suspended?"Réactiver cette licence":"Suspendre cette licence (ex: départ salarié)"}
+                        onClick={async()=>{
+                          const action = k.suspended ? "réactiver" : "suspendre";
+                          if(!confirm(`Voulez-vous ${action} cette licence ?`)) return;
+                          await supabase.from("activation_keys").update({ suspended: !k.suspended }).eq("id",k.id);
+                          if (!k.suspended) {
+                            // Also suspend the user's subscription
+                            const userId = data.profiles?.find(p=>p.email===k.email)?.id;
+                            if (userId) await supabase.from("subscriptions").update({ status:"suspended" }).eq("user_id",userId);
+                          } else {
+                            const userId = data.profiles?.find(p=>p.email===k.email)?.id;
+                            if (userId) await supabase.from("subscriptions").update({ status:"active" }).eq("user_id",userId);
+                          }
+                          notify(k.suspended ? "✅ Licence réactivée" : "🔒 Licence suspendue");
+                          call("getData").then(d=>setData(d));
+                        }}>{k.suspended ? "✅ Réactiver" : "🔒 Suspendre"}</button>
+                    )}
                   </div>
                   <div style={{ fontSize:11, color:"#BBBBBB", fontFamily:"'Helvetica Neue',sans-serif", marginTop:3 }}>
-                    {k.key_type} · {k.email||"—"} · expire {new Date(k.expires_at).toLocaleDateString("fr-FR")}
+                    {k.key_type} · {k.plan} · {k.email||"—"} · expire {new Date(k.expires_at).toLocaleDateString()}
                     {k.notes && ` · ${k.notes}`}
+                    {k.email_sent && <span style={{ color:"#00C48C", marginLeft:6 }}>✉️ envoyé</span>}
+                    {k.email && !k.email_sent && !k.used && <span style={{ color:"#FF9500", marginLeft:6 }}>⚠️ email non envoyé</span>}
                   </div>
                 </div>
               ))}
