@@ -3074,57 +3074,137 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
           )}
 
           {/* ── TOUTES LES KEYS ── */}
-          {tab === "allkeys" && (
-            <div style={C}>
-              <h3 style={CT}>{data.keys?.length} clés · {stats.usedKeys} utilisées</h3>
-              {data.keys?.map(k => (
-                <div key={k.id} style={{ padding:"10px 0", borderBottom:"1px solid #F0EBE0" }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                    <div style={{ fontFamily:"'Courier New',monospace", fontSize:13, fontWeight:700, color:k.used?"#aaa":"#1A1A1A", flex:1, letterSpacing:1, textDecoration:k.used?"line-through":"none" }}>{k.key}</div>
-                    <button style={{ border:"none", background:"transparent", cursor:"pointer", fontSize:14, padding:"2px 6px" }}
-                      onClick={()=>{ navigator.clipboard.writeText(k.key); notify(t("kpi_copied",lang)); }}>📋</button>
-                    <div style={{ fontSize:10, padding:"2px 7px", borderRadius:10, background:k.suspended?"#FFF0F0":k.used?"#F0EBE0":"#EBF8F4", color:k.suspended?"#FF2D2D":k.used?"#888":"#00875A", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}>
-                      {k.suspended?"🔒 Suspendue":k.used?t("kpi_used_keys",lang):"Disponible"}
-                    </div>
-                    {!k.used && (
-                      <button style={{ border:"none", background:"#FFF0F0", color:"#FF2D2D", cursor:"pointer", fontSize:11, padding:"3px 8px", borderRadius:6, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
-                        onClick={async()=>{
-                          if(!confirm("Supprimer cette clé ?")) return;
-                          await supabase.from("activation_keys").delete().eq("id",k.id);
-                          notify("🗑 Clé supprimée");
-                          call("getData").then(d=>setData(d));
-                        }}>🗑</button>
-                    )}
-                    {k.used && (
-                      <button style={{ border:"none", background:k.suspended?"#EBF8F4":"#FFF8F0", color:k.suspended?"#00875A":"#FF9500", cursor:"pointer", fontSize:11, padding:"3px 8px", borderRadius:6, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
-                        title={k.suspended?"Réactiver cette licence":"Suspendre cette licence (ex: départ salarié)"}
-                        onClick={async()=>{
-                          const action = k.suspended ? "réactiver" : "suspendre";
-                          if(!confirm(`Voulez-vous ${action} cette licence ?`)) return;
-                          await supabase.from("activation_keys").update({ suspended: !k.suspended }).eq("id",k.id);
-                          if (!k.suspended) {
-                            // Also suspend the user's subscription
-                            const userId = data.profiles?.find(p=>p.email===k.email)?.id;
-                            if (userId) await supabase.from("subscriptions").update({ status:"suspended" }).eq("user_id",userId);
-                          } else {
-                            const userId = data.profiles?.find(p=>p.email===k.email)?.id;
-                            if (userId) await supabase.from("subscriptions").update({ status:"active" }).eq("user_id",userId);
-                          }
-                          notify(k.suspended ? "✅ Licence réactivée" : "🔒 Licence suspendue");
-                          call("getData").then(d=>setData(d));
-                        }}>{k.suspended ? "✅ Réactiver" : "🔒 Suspendre"}</button>
-                    )}
+          {tab === "allkeys" && (() => {
+            // ── Grouper les clés par entreprise (batch_id) ──
+            const keysByBatch = {};
+            (data.keys||[]).forEach(k => {
+              const batchId = k.batch_id || "solo_" + k.id;
+              if (!keysByBatch[batchId]) {
+                // Find company name
+                const company = data.companies?.find(c => c.id === k.company_id);
+                keysByBatch[batchId] = {
+                  companyName: company?.name || (k.key_type === "individual" ? "Licence individuelle" : k.notes?.split(" — ")[0] || "Sans nom"),
+                  companyEmail: company?.email || k.email || "—",
+                  plan: k.plan,
+                  expiresAt: k.expires_at,
+                  keys: [],
+                };
+              }
+              keysByBatch[batchId].keys.push(k);
+            });
+
+            // Sort batches: most recent first
+            const batches = Object.entries(keysByBatch).sort((a,b) =>
+              new Date(b[1].expiresAt) - new Date(a[1].expiresAt)
+            );
+
+            const KeyRow = ({ k }) => (
+              <div key={k.id} style={{ padding:"8px 0", borderBottom:"1px solid #F5F0E8" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  {/* Type badge */}
+                  <div style={{ fontSize:9, padding:"2px 6px", borderRadius:6, background: k.key_type==="manager"?"#FF4C1A":k.key_type==="individual"?"#1A6AFF":"#E8E0D4", color: k.key_type==="manager"||k.key_type==="individual"?"#fff":"#444", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:700, flexShrink:0 }}>
+                    {k.key_type==="manager"?"MGR":k.key_type==="individual"?"INDIV":"COM"}
                   </div>
-                  <div style={{ fontSize:11, color:"#BBBBBB", fontFamily:"'Helvetica Neue',sans-serif", marginTop:3 }}>
-                    {k.key_type} · {k.plan} · {k.email||"—"} · expire {new Date(k.expires_at).toLocaleDateString()}
-                    {k.notes && ` · ${k.notes}`}
-                    {k.email_sent && <span style={{ color:"#00C48C", marginLeft:6 }}>✉️ envoyé</span>}
-                    {k.email && !k.email_sent && !k.used && <span style={{ color:"#FF9500", marginLeft:6 }}>⚠️ email non envoyé</span>}
+                  {/* Key */}
+                  <div style={{ fontFamily:"'Courier New',monospace", fontSize:12, fontWeight:700, color:k.suspended?"#FF2D2D":k.used?"#aaa":"#1A1A1A", flex:1, letterSpacing:1, textDecoration:k.used&&!k.suspended?"line-through":"none" }}>
+                    {k.key}
+                  </div>
+                  {/* Copy */}
+                  <button style={{ border:"none", background:"transparent", cursor:"pointer", fontSize:13, padding:"2px 4px" }}
+                    onClick={()=>{ navigator.clipboard.writeText(k.key); notify(t("kpi_copied",lang)); }}>📋</button>
+                  {/* Status badge */}
+                  <div style={{ fontSize:10, padding:"2px 7px", borderRadius:10, background:k.suspended?"#FFF0F0":k.used?"#F0EBE0":"#EBF8F4", color:k.suspended?"#FF2D2D":k.used?"#888":"#00875A", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, flexShrink:0 }}>
+                    {k.suspended?"🔒 Suspendue":k.used?t("kpi_used_keys",lang):"Disponible"}
+                  </div>
+                  {/* Delete */}
+                  {!k.used && (
+                    <button style={{ border:"none", background:"#FFF0F0", color:"#FF2D2D", cursor:"pointer", fontSize:11, padding:"3px 8px", borderRadius:6, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
+                      onClick={async()=>{
+                        if(!confirm("Supprimer cette clé ?")) return;
+                        await supabase.from("activation_keys").delete().eq("id",k.id);
+                        notify("🗑 Clé supprimée");
+                        call("getData").then(d=>setData(d));
+                      }}>🗑</button>
+                  )}
+                  {/* Suspend/reactivate */}
+                  {k.used && (
+                    <button style={{ border:"none", background:k.suspended?"#EBF8F4":"#FFF8F0", color:k.suspended?"#00875A":"#FF9500", cursor:"pointer", fontSize:11, padding:"3px 8px", borderRadius:6, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
+                      onClick={async()=>{
+                        if(!confirm(`Voulez-vous ${k.suspended?"réactiver":"suspendre"} cette licence ?`)) return;
+                        await supabase.from("activation_keys").update({ suspended: !k.suspended }).eq("id",k.id);
+                        const userId = data.profiles?.find(p=>p.email===k.email)?.id;
+                        if (userId) await supabase.from("subscriptions").update({ status: k.suspended?"active":"suspended" }).eq("user_id",userId);
+                        notify(k.suspended ? "✅ Licence réactivée" : "🔒 Licence suspendue");
+                        call("getData").then(d=>setData(d));
+                      }}>{k.suspended ? "✅ Réactiver" : "🔒 Suspendre"}</button>
+                  )}
+                </div>
+                {/* Meta info */}
+                <div style={{ fontSize:10, color:"#BBBBBB", fontFamily:"'Helvetica Neue',sans-serif", marginTop:2, paddingLeft:52 }}>
+                  {k.email || "—"} · expire {new Date(k.expires_at).toLocaleDateString()}
+                  {k.email_sent && <span style={{ color:"#00C48C", marginLeft:6 }}>✉️ envoyé</span>}
+                  {k.email && !k.email_sent && <span style={{ color:"#FF9500", marginLeft:6 }}>⚠️ email non envoyé</span>}
+                </div>
+              </div>
+            );
+
+            return (
+              <div>
+                {/* Header stats */}
+                <div style={{ ...C, marginBottom:12 }}>
+                  <div style={{ display:"flex", gap:16, flexWrap:"wrap" }}>
+                    {[
+                      { label:"Total clés",   value: data.keys?.length || 0,                                bg:"#1A1A1A", fg:"#E8E0D4" },
+                      { label:"Utilisées",    value: data.keys?.filter(k=>k.used).length || 0,             bg:"#E8E0D4", fg:"#888"    },
+                      { label:"Disponibles",  value: data.keys?.filter(k=>!k.used&&!k.suspended).length||0,bg:"#EBF8F4", fg:"#00875A" },
+                      { label:"Suspendues",   value: data.keys?.filter(k=>k.suspended).length || 0,        bg:"#FFF0F0", fg:"#FF2D2D" },
+                      { label:"Entreprises",  value: batches.length,                                        bg:"#F5F0E8", fg:"#FF4C1A" },
+                    ].map(s => (
+                      <div key={s.label} style={{ background:s.bg, borderRadius:8, padding:"8px 14px", textAlign:"center" }}>
+                        <div style={{ fontSize:20, fontWeight:700, color:s.fg, lineHeight:1 }}>{s.value}</div>
+                        <div style={{ fontSize:9, color:s.fg, opacity:0.8, fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5, marginTop:2 }}>{s.label}</div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+
+                {/* Grouped by company */}
+                {batches.map(([batchId, batch]) => {
+                  const used = batch.keys.filter(k=>k.used).length;
+                  const total = batch.keys.length;
+                  const hasSuspended = batch.keys.some(k=>k.suspended);
+                  const isTrial = batch.plan === "trial";
+                  return (
+                    <div key={batchId} style={{ ...C, marginBottom:10 }}>
+                      {/* Company header */}
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8, paddingBottom:8, borderBottom:"2px solid #F0EBE0" }}>
+                        <div>
+                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                            <span style={{ fontSize:16 }}>🏢</span>
+                            <span style={{ fontSize:14, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>{batch.companyName}</span>
+                            {isTrial && <span style={{ fontSize:10, padding:"1px 6px", borderRadius:10, background:"#1A6AFF", color:"#fff", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}>ESSAI</span>}
+                            {hasSuspended && <span style={{ fontSize:10, padding:"1px 6px", borderRadius:10, background:"#FFF0F0", color:"#FF2D2D", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}>🔒 SUSPENDU</span>}
+                          </div>
+                          <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>
+                            {batch.companyEmail} · {used}/{total} licences utilisées · expire {new Date(batch.expiresAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                        {/* Copy all available keys */}
+                        <button style={{ fontSize:11, padding:"4px 10px", border:"1.5px solid #E8E0D4", borderRadius:8, background:"#fff", cursor:"pointer", fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}
+                          onClick={()=>{
+                            const available = batch.keys.filter(k=>!k.used&&!k.suspended).map(k=>k.key).join("\n");
+                            if (available) { navigator.clipboard.writeText(available); notify(`📋 ${batch.keys.filter(k=>!k.used).length} clé(s) copiée(s)`); }
+                            else notify("Aucune clé disponible", "error");
+                          }}>📋 Tout copier</button>
+                      </div>
+                      {/* Keys list */}
+                      {batch.keys.map(k => <KeyRow key={k.id} k={k} />)}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </>
       )}
     </div>
