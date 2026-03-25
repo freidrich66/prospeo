@@ -2423,6 +2423,7 @@ function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
 function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
   const [data, setData]           = useState(null);
   const [loading, setLoading]     = useState(true);
+  const [deletedKeyIds, setDeletedKeyIds] = useState(new Set()); // track locally deleted keys
   const [tab, setTab]             = useState("stats");
   const [genQty, setGenQty]       = useState(1);
   const [genEmail, setGenEmail]   = useState("");
@@ -2451,7 +2452,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
   };
 
   useEffect(() => {
-    call("getData").then(d => { setData(d); setLoading(false); });
+    call("getData").then(d => { setData(d ? {...d, keys: (d.keys||[]).filter(k => !deletedKeyIds.has(k.id))} : d); setLoading(false); });
   }, []);
 
   const generateKeys = async () => {
@@ -2466,7 +2467,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
     if (res.success) {
       setNewKeys(res.keys);
       notify(`✅ ${res.message}`);
-      call("getData").then(d => setData(d));
+      call("getData").then(d => setData(d ? {...d, keys: (d.keys||[]).filter(k => !deletedKeyIds.has(k.id))} : d));
     } else {
       notify(res.error || "Erreur", "error");
     }
@@ -2487,7 +2488,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
     if (res.success) {
       setAddedKeys(res.keys);
       notify(`✅ ${res.message}`);
-      call("getData").then(d => setData(d));
+      call("getData").then(d => setData(d ? {...d, keys: (d.keys||[]).filter(k => !deletedKeyIds.has(k.id))} : d));
     } else {
       notify(res.error || "Erreur", "error");
     }
@@ -2497,20 +2498,20 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
   const grantLifetime = async (userId, name) => {
     if (!confirm(`Attribuer une licence GRATUITE À VIE à ${name} ?`)) return;
     const res = await call("grantLifetime", { userId });
-    if (res.success) { notify(`✅ Licence gratuite à vie attribuée à ${name}`); call("getData").then(d => setData(d)); }
+    if (res.success) { notify(`✅ Licence gratuite à vie attribuée à ${name}`); call("getData").then(d => setData(d ? {...d, keys: (d.keys||[]).filter(k => !deletedKeyIds.has(k.id))} : d)); }
     else notify(res.error, "error");
   };
 
   const disableAccount = async (userId, name) => {
     if (!confirm(`Désactiver le compte de ${name} ?`)) return;
     const res = await call("disableAccount", { userId });
-    if (res.success) { notify(t("kpi_disabled",lang)); call("getData").then(d => setData(d)); }
+    if (res.success) { notify(t("kpi_disabled",lang)); call("getData").then(d => setData(d ? {...d, keys: (d.keys||[]).filter(k => !deletedKeyIds.has(k.id))} : d)); }
     else notify(res.error, "error");
   };
 
   const extendAccount = async (userId, name) => {
     const res = await call("extendSubscription", { userId, months: 12 });
-    if (res.success) { notify(`✅ ${name} prolongé de 12 mois`); call("getData").then(d => setData(d)); }
+    if (res.success) { notify(`✅ ${name} prolongé de 12 mois`); call("getData").then(d => setData(d ? {...d, keys: (d.keys||[]).filter(k => !deletedKeyIds.has(k.id))} : d)); }
     else notify(res.error, "error");
   };
 
@@ -3122,7 +3123,8 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
                       onClick={async()=>{
                         if(!confirm("Supprimer cette clé ?")) return;
                         await supabase.from("activation_keys").delete().eq("id",k.id);
-                        // Mise à jour locale immédiate
+                        // Mise à jour locale immédiate + mémorisation de l'ID supprimé
+                        setDeletedKeyIds(prev => new Set([...prev, k.id]));
                         setData(prev => ({ ...prev, keys: prev.keys.filter(key => key.id !== k.id) }));
                         notify("🗑 Clé supprimée");
                       }}>🗑</button>
