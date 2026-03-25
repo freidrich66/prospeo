@@ -3122,8 +3122,9 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
                       onClick={async()=>{
                         if(!confirm("Supprimer cette clé ?")) return;
                         await supabase.from("activation_keys").delete().eq("id",k.id);
+                        // Mise à jour locale immédiate
+                        setData(prev => ({ ...prev, keys: prev.keys.filter(key => key.id !== k.id) }));
                         notify("🗑 Clé supprimée");
-                        call("getData").then(d=>setData(d));
                       }}>🗑</button>
                   )}
                   {/* Suspend/reactivate */}
@@ -3134,8 +3135,9 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
                         await supabase.from("activation_keys").update({ suspended: !k.suspended }).eq("id",k.id);
                         const userId = data.profiles?.find(p=>p.email===k.email)?.id;
                         if (userId) await supabase.from("subscriptions").update({ status: k.suspended?"active":"suspended" }).eq("user_id",userId);
+                        // Mise à jour locale immédiate
+                        setData(prev => ({ ...prev, keys: prev.keys.map(key => key.id===k.id ? {...key, suspended:!k.suspended} : key) }));
                         notify(k.suspended ? "✅ Licence réactivée" : "🔒 Licence suspendue");
-                        call("getData").then(d=>setData(d));
                       }}>{k.suspended ? "✅ Réactiver" : "🔒 Suspendre"}</button>
                   )}
                 </div>
