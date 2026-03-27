@@ -46,18 +46,20 @@ export default async function handler(req, res) {
 
     // ── GENERATE KEYS MANUALLY ──────────────────────────────
     if (action === "generateKeys") {
-      const { quantity = 1, email, companyName, notes, trialDays = 0, commercialEmails = [] } = req.body;
+      const { quantity = 1, email, companyName, notes, trialDays = 0, isFree = false, commercialEmails = [] } = req.body;
       // commercialEmails = array of emails for each commercial slot (optional)
       const qty      = Math.max(1, parseInt(quantity));
       const batchId  = crypto.randomUUID();
       const expiresAt = new Date();
-      if (trialDays > 0) {
+      if (isFree) {
+        expiresAt.setFullYear(2099); // Gratuit = à vie
+      } else if (trialDays > 0) {
         expiresAt.setDate(expiresAt.getDate() + trialDays);
       } else {
         expiresAt.setFullYear(expiresAt.getFullYear() + 1);
       }
-      const keyPlan = trialDays > 0 ? "trial" : "annual";
-      const trialSuffix = trialDays > 0 ? ` [ESSAI ${trialDays} jours]` : "";
+      const keyPlan = isFree ? "free" : trialDays > 0 ? "trial" : "annual";
+      const trialSuffix = isFree ? " [GRATUIT]" : trialDays > 0 ? ` [ESSAI ${trialDays} jours]` : "";
 
       const keysToInsert = [];
 
