@@ -2489,6 +2489,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
       quantity: addQty,
       notes: addNotes,
       trialDays: addTrial === "trial7" ? 7 : addTrial === "trial14" ? 14 : 0,
+      isFree: addTrial === "free",
     });
     if (res.success) {
       setAddedKeys(res.keys);
@@ -3032,9 +3033,10 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
                       <label style={L}>Type</label>
                       <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
                         {[
-                          { val:"annual",  label:"💳 12 mois", color:"#1A1A1A", tc:"#E8E0D4" },
+                          { val:"annual",  label:"💳 12 mois",  color:"#1A1A1A", tc:"#E8E0D4" },
                           { val:"trial7",  label:"🎁 7 jours",  color:"#1A6AFF", tc:"#fff"    },
                           { val:"trial14", label:"🎁 14 jours", color:"#00C48C", tc:"#fff"    },
+                          { val:"free",    label:"🆓 Gratuit",  color:"#FF4C1A", tc:"#fff"    },
                         ].map(opt => (
                           <button key={opt.val}
                             style={{ flex:1, padding:"8px 6px", border:`2px solid ${addTrial===opt.val?opt.color:"#E8E0D4"}`, borderRadius:8, background:addTrial===opt.val?opt.color:"transparent", color:addTrial===opt.val?opt.tc:"#888", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
@@ -3049,10 +3051,12 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
                     <input style={I} placeholder="Ex: Extension contrat mars 2026..." value={addNotes} onChange={e=>setAddNotes(e.target.value)} />
                   </div>
 
-                  <div style={{ padding:12, background:addTrial!=="annual"?"#EBF0FF":"#F5F0E8", borderRadius:10, marginBottom:14, fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>
-                    {addTrial !== "annual"
-                      ? <span>🎁 <strong>{addQty} clé(s) d'essai</strong> — aucune facturation</span>
-                      : <span>💶 <strong>{(addQty * 59.88).toFixed(2)}€ HT</strong> · {addQty} × 59,88€/an</span>
+                  <div style={{ padding:12, background:addTrial==="free"?"#FFF3F0":addTrial!=="annual"?"#EBF0FF":"#F5F0E8", borderRadius:10, marginBottom:14, fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>
+                    {addTrial === "free"
+                      ? <span>🆓 <strong>{addQty} licence(s) gratuite(s)</strong> — sans facturation · accès jusqu'en 2099</span>
+                      : addTrial !== "annual"
+                        ? <span>🎁 <strong>{addQty} clé(s) d'essai</strong> — aucune facturation</span>
+                        : <span>💶 <strong>{(addQty * 59.88).toFixed(2)}€ HT</strong> · {addQty} × 59,88€/an</span>
                     }
                   </div>
 
