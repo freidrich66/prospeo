@@ -2462,6 +2462,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
       quantity: genQty, email: genEmail,
       companyName: genCompany, notes: genNotes,
       trialDays: genTrial === 'trial7' ? 7 : genTrial === 'trial14' ? 14 : 0,
+      isFree: genTrial === 'free',
       commercialEmails: commEmails.filter(e=>e.trim()), // pre-assigned emails
     });
     if (res.success) {
@@ -2856,9 +2857,10 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
                   <label style={L}>Type</label>
                   <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                     {[
-                      { val:"annual", label:"💳 Payante (12 mois)", color:"#1A1A1A", textColor:"#E8E0D4" },
-                      { val:"trial7", label:"🎁 Essai 7 jours",     color:"#1A6AFF", textColor:"#fff"    },
-                      { val:"trial14",label:"🎁 Essai 14 jours",    color:"#00C48C", textColor:"#fff"    },
+                      { val:"annual",  label:"💳 Payante (12 mois)",  color:"#1A1A1A", textColor:"#E8E0D4" },
+                      { val:"trial7",  label:"🎁 Essai 7 jours",      color:"#1A6AFF", textColor:"#fff"    },
+                      { val:"trial14", label:"🎁 Essai 14 jours",     color:"#00C48C", textColor:"#fff"    },
+                      { val:"free",    label:"🆓 Gratuite (sans fact.)",color:"#FF4C1A", textColor:"#fff"   },
                     ].map(opt => (
                       <button key={opt.val}
                         style={{ flex:1, minWidth:100, padding:"10px 8px", border:`2px solid ${genTrial===opt.val?opt.color:"#E8E0D4"}`, borderRadius:8, background:genTrial===opt.val?opt.color:"transparent", color:genTrial===opt.val?opt.textColor:"#888", cursor:"pointer", fontSize:11, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
@@ -2872,11 +2874,13 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
                 </div>
               </div>
 
-              <div style={{ padding:14, background: genTrial?"#EBF0FF":"#F5F0E8", borderRadius:10, marginBottom:14 }}>
+              <div style={{ padding:14, background: genTrial==="free"?"#FFF3F0":genTrial!=="annual"?"#EBF0FF":"#F5F0E8", borderRadius:10, marginBottom:14 }}>
                 <div style={{ fontSize:13, fontFamily:"'Helvetica Neue',sans-serif", color:"#444" }}>
-                  {genTrial !== "annual"
-                    ? <span>🎁 <strong>Clé(s) d'essai gratuit {genTrial === "trial7" ? "7" : "14"} jours</strong> — aucune facturation</span>
-                    : <span>💶 Total : <strong>{(parseInt(genQty||1) * 59.88).toFixed(2)}€</strong> HT · {parseInt(genQty||1)} × 59,88€/licence/an</span>
+                  {genTrial === "free"
+                    ? <span>🆓 <strong>Licence(s) gratuite(s) — sans facturation</strong> · Accès illimité accordé par le Super Admin</span>
+                    : genTrial !== "annual"
+                      ? <span>🎁 <strong>Clé(s) d'essai gratuit {genTrial === "trial7" ? "7" : "14"} jours</strong> — aucune facturation</span>
+                      : <span>💶 Total : <strong>{(parseInt(genQty||1) * 59.88).toFixed(2)}€</strong> HT · {parseInt(genQty||1)} × 59,88€/licence/an</span>
                   }
                 </div>
               </div>
@@ -3133,8 +3137,8 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
                         notify("🗑 Clé supprimée");
                       }}>🗑</button>
                   )}
-                  {/* Suspend/reactivate */}
-                  {k.used && (
+                  {/* Suspend/reactivate — visible pour toutes les clés utilisées ET les clés avec email assigné */}
+                  {(k.used || k.email) && (
                     <button style={{ border:"none", background:k.suspended?"#EBF8F4":"#FFF8F0", color:k.suspended?"#00875A":"#FF9500", cursor:"pointer", fontSize:11, padding:"3px 8px", borderRadius:6, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
                       onClick={async()=>{
                         if(!confirm(`Voulez-vous ${k.suspended?"réactiver":"suspendre"} cette licence ?`)) return;
