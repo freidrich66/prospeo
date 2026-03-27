@@ -203,18 +203,20 @@ export default async function handler(req, res) {
 
     // ── ADD LICENCES TO EXISTING COMPANY ──────────────────
     if (action === "addLicences") {
-      const { companyId, quantity = 1, notes, trialDays = 0 } = req.body;
+      const { companyId, quantity = 1, notes, trialDays = 0, isFree = false } = req.body;
       if (!companyId) return res.status(400).json({ error: "companyId requis" });
 
       const qty = Math.max(1, parseInt(quantity));
       const expiresAt = new Date();
-      if (trialDays > 0) {
+      if (isFree) {
+        expiresAt.setFullYear(2099);
+      } else if (trialDays > 0) {
         expiresAt.setDate(expiresAt.getDate() + trialDays);
       } else {
         expiresAt.setFullYear(expiresAt.getFullYear() + 1);
       }
-      const keyPlan = trialDays > 0 ? "trial" : "annual";
-      const trialSuffix = trialDays > 0 ? ` [ESSAI ${trialDays} jours]` : "";
+      const keyPlan = isFree ? "free" : trialDays > 0 ? "trial" : "annual";
+      const trialSuffix = isFree ? " [GRATUIT]" : trialDays > 0 ? ` [ESSAI ${trialDays} jours]` : "";
 
       // Get existing batch_id for this company to keep them grouped
       const { data: existingKeys } = await supabase
