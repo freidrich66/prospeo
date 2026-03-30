@@ -4,18 +4,38 @@ import { LANGUAGES, t, detectBrowserLang, getSavedLang, saveLang } from "./i18n.
 
 // ── Thèmes ───────────────────────────────────────────────────
 const THEMES = [
-  { id:"sand",    name:{fr:"Sable",   en:"Sand",    es:"Arena",  pt:"Areia",   it:"Sabbia", de:"Sand",     no:"Sand",   sv:"Sand",   nl:"Zand",   zh:"沙色"  }, bg:"F5F0E8", sidebar:"1A1A1A", accent:"FF4C1A", card:"FFFFFF", cardBorder:"F0EBE3", text:"1A1A1A", subtext:"888888", inputBorder:"E8E0D4", preview:["F5F0E8","FF4C1A","1A1A1A"] },
-  { id:"slate",   name:{fr:"Ardoise", en:"Slate",   es:"Pizarra",pt:"Ardósia", it:"Ardesia",de:"Schiefer", no:"Skifer", sv:"Skiffer",nl:"Leisteen",zh:"石板"  }, bg:"EEF2F7", sidebar:"2D3748", accent:"3B82F6", card:"FFFFFF", cardBorder:"E2E8F0", text:"1A202C", subtext:"718096", inputBorder:"CBD5E0", preview:["EEF2F7","3B82F6","2D3748"] },
-  { id:"forest",  name:{fr:"Forêt",   en:"Forest",  es:"Bosque", pt:"Floresta",it:"Foresta",de:"Wald",     no:"Skog",   sv:"Skog",   nl:"Woud",   zh:"森林"  }, bg:"EDF5EF", sidebar:"1A3D2B", accent:"10B981", card:"FFFFFF", cardBorder:"D1FAE5", text:"1A3D2B", subtext:"6B7280", inputBorder:"A7F3D0", preview:["EDF5EF","10B981","1A3D2B"] },
-  { id:"night",   name:{fr:"Nuit",    en:"Night",   es:"Noche",  pt:"Noite",   it:"Notte",  de:"Nacht",    no:"Natt",   sv:"Natt",   nl:"Nacht",  zh:"夜晚"  }, bg:"1A1A2E", sidebar:"16213E", accent:"E94560", card:"242435", cardBorder:"2D2D45", text:"E8E0D4", subtext:"9CA3AF", inputBorder:"3A3A5C", preview:["1A1A2E","E94560","16213E"] },
-  { id:"lavande", name:{fr:"Lavande", en:"Lavender",es:"Lavanda",pt:"Lavanda", it:"Lavanda",de:"Lavendel", no:"Lavendel",sv:"Lavendel",nl:"Lavendel",zh:"薰衣草"}, bg:"F5F3FF", sidebar:"4C1D95", accent:"8B5CF6", card:"FFFFFF", cardBorder:"DDD6FE", text:"1A1A1A", subtext:"6B7280", inputBorder:"C4B5FD", preview:["F5F3FF","8B5CF6","4C1D95"] },
-  { id:"rose",    name:{fr:"Rose",    en:"Rose",    es:"Rosa",   pt:"Rosa",    it:"Rosa",   de:"Rosa",     no:"Rose",   sv:"Rosa",   nl:"Roze",   zh:"玫瑰"  }, bg:"FFF5F7", sidebar:"831843", accent:"EC4899", card:"FFFFFF", cardBorder:"FCE7F3", text:"1A1A1A", subtext:"6B7280", inputBorder:"F9A8D4", preview:["FFF5F7","EC4899","831843"] },
+  { id:"parchment", name:{fr:"Parchemin",en:"Parchment",es:"Pergamino",pt:"Pergaminho",it:"Pergamena",de:"Pergament",no:"Pergament",sv:"Pergament",nl:"Perkament",zh:"羊皮纸"},
+    bg:"F5F0E8", sidebar:"292524", accent:"FF4C1A", card:"FDFCFB", cardBorder:"E8E2D9", text:"1C1917", subtext:"78716C", inputBorder:"D6CFC6", preview:["F5F0E8","FF4C1A","292524"] },
+
+  { id:"ivory", name:{fr:"Ivoire",en:"Ivory",es:"Marfil",pt:"Marfim",it:"Avorio",de:"Elfenbein",no:"Elfenben",sv:"Elfenben",nl:"Ivoor",zh:"象牙白"},
+    bg:"FAF9F6", sidebar:"1C1917", accent:"E8611A", card:"FFFFFF", cardBorder:"E8E5DF", text:"1C1917", subtext:"79716C", inputBorder:"DDD8D0", preview:["FAF9F6","E8611A","1C1917"] },
+
+  { id:"linen", name:{fr:"Lin",en:"Linen",es:"Lino",pt:"Linho",it:"Lino",de:"Leinen",no:"Lin",sv:"Lin",nl:"Linnen",zh:"亚麻"},
+    bg:"F8F4EE", sidebar:"44403C", accent:"0F766E", card:"FFFEFB", cardBorder:"E5DDD2", text:"292524", subtext:"78716C", inputBorder:"D6CEC4", preview:["F8F4EE","0F766E","44403C"] },
+
+  { id:"chalk", name:{fr:"Craie",en:"Chalk",es:"Tiza",pt:"Giz",it:"Gesso",de:"Kreide",no:"Kritt",sv:"Krita",nl:"Krijt",zh:"粉笔白"},
+    bg:"FAFAF9", sidebar:"18181B", accent:"7C3AED", card:"FFFFFF", cardBorder:"E4E4E7", text:"18181B", subtext:"71717A", inputBorder:"D4D4D8", preview:["FAFAF9","7C3AED","18181B"] },
+
+  { id:"notion", name:{fr:"Notion",en:"Notion",es:"Notion",pt:"Notion",it:"Notion",de:"Notion",no:"Notion",sv:"Notion",nl:"Notion",zh:"Notion"},
+    bg:"FFFFFF", sidebar:"37352F", accent:"2F9E44", card:"FFFFFF", cardBorder:"E8E8E7", text:"37352F", subtext:"9B9A97", inputBorder:"E0DEDD", preview:["FFFFFF","2F9E44","37352F"] },
+
+  { id:"linear", name:{fr:"Linear",en:"Linear",es:"Linear",pt:"Linear",it:"Linear",de:"Linear",no:"Linear",sv:"Linear",nl:"Linear",zh:"Linear"},
+    bg:"F8FAFC", sidebar:"0F172A", accent:"6366F1", card:"FFFFFF", cardBorder:"E2E8F0", text:"0F172A", subtext:"64748B", inputBorder:"CBD5E1", preview:["F8FAFC","6366F1","0F172A"] },
+
+  { id:"figma", name:{fr:"Figma",en:"Figma",es:"Figma",pt:"Figma",it:"Figma",de:"Figma",no:"Figma",sv:"Figma",nl:"Figma",zh:"Figma"},
+    bg:"F5F5F5", sidebar:"2C2C2C", accent:"F24E1E", card:"FFFFFF", cardBorder:"E0E0E0", text:"2C2C2C", subtext:"737373", inputBorder:"D4D4D4", preview:["F5F5F5","F24E1E","2C2C2C"] },
+
+  { id:"dusk", name:{fr:"Crépuscule",en:"Dusk",es:"Crepúsculo",pt:"Crepúsculo",it:"Crepuscolo",de:"Dämmerung",no:"Skumring",sv:"Skymning",nl:"Schemering",zh:"黄昏"},
+    bg:"1C1917", sidebar:"0C0A09", accent:"F97316", card:"292524", cardBorder:"3C3532", text:"E7E5E4", subtext:"A8A29E", inputBorder:"44403C", preview:["1C1917","F97316","0C0A09"] },
+
+  { id:"midnight", name:{fr:"Minuit",en:"Midnight",es:"Medianoche",pt:"Meia-noite",it:"Mezzanotte",de:"Mitternacht",no:"Midnatt",sv:"Midnatt",nl:"Middernacht",zh:"午夜"},
+    bg:"0F172A", sidebar:"020617", accent:"38BDF8", card:"1E293B", cardBorder:"293548", text:"E2E8F0", subtext:"94A3B8", inputBorder:"334155", preview:["0F172A","38BDF8","020617"] },
 ];
 const DEFAULT_THEME = THEMES[0];
 function getTheme(id) { return THEMES.find(th=>th.id===id) || DEFAULT_THEME; }
 const ThemeContext = createContext({ theme: DEFAULT_THEME, applyTheme: ()=>{} });
 const useTheme = () => useContext(ThemeContext);
-function loadSavedTheme() { try { return localStorage.getItem("prospeo_theme") || "sand"; } catch(e) { return "sand"; } }
+function loadSavedTheme() { try { return localStorage.getItem("prospeo_theme") || "parchment"; } catch(e) { return "sand"; } }
 function saveThemeLocal(id) { try { localStorage.setItem("prospeo_theme", id); } catch(e) {} }
 
 const STATUS_COLORS_BASE = {
@@ -2116,7 +2136,7 @@ function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, theme, 
           <label style={L}>🎨 Thème de l'application</label>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginTop:10 }}>
             {THEMES.map(th => {
-              const isActive = (theme?.id || "sand") === th.id;
+              const isActive = (theme?.id || "parchment") === th.id;
               return (
                 <button key={th.id}
                   onClick={()=>applyTheme && applyTheme(th.id)}
