@@ -77,12 +77,27 @@ export default async function handler(req, res) {
       if (qty === 1) {
         // ── 1 licence individuelle ──────────────────────────
         const key = genKey();
+
+        // Créer l'entreprise même pour les licences individuelles
+        let companyId = null;
+        if (companyName) {
+          const { data: company } = await supabase.from("companies").insert({
+            name: companyName,
+            email: email || session.customer_email,
+            licence_count: 1,
+            stripe_session_id: session.id,
+            stripe_customer_id: session.customer || null,
+          }).select().single();
+          companyId = company?.id;
+        }
+
         await supabase.from("activation_keys").insert({
           key, email: email || session.customer_email,
           key_type: "individual", plan: "annual",
           batch_id: batchId,
+          company_id: companyId,
           stripe_session_id: session.id,
-          notes: "Achat individuel 35,88€/an",
+          notes: `Achat Stripe annuel${companyName ? " — " + companyName : ""}`,
           expires_at: expiresAt.toISOString(),
         });
 
