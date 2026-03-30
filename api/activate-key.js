@@ -82,6 +82,12 @@ export default async function handler(req, res) {
     const plan   = keyData.plan || "annual";
     const status = plan === "trial" ? "trial" : plan === "free" ? "lifetime" : "active";
 
+    // Supprimer l'ancienne subscription d'essai pour forcer la mise à jour complète
+    await supabase
+      .from("subscriptions")
+      .delete()
+      .eq("user_id", userId);
+
     const subData = {
       user_id:            userId,
       plan:               plan === "trial" ? "trial" : "annual",
@@ -89,19 +95,19 @@ export default async function handler(req, res) {
       current_period_end: keyData.expires_at,
       stripe_customer_id: null,
       stripe_sub_id:      null,
+      trial_ends_at:      plan === "trial" ? keyData.expires_at : null,
     };
-
-    // Ajouter trial_ends_at si c'est un essai
-    if (plan === "trial") {
-      subData.trial_ends_at = keyData.expires_at;
-    }
 
     const { error: subErr } = await supabase
       .from("subscriptions")
-      .upsert(subData, { onConflict: "user_id" });
+      .insert(subData);
 
     if (subErr) {
-      console.error("Subscription upsert error:", subErr.message);
+      console.error("Subscription insert error:", subErr.message);
+      // Fallback: try upsert
+      await supabase
+        .from("subscriptions")
+        .upsert({ ...subData }, { onConflict: "user_id" });
     }
 
     console.log(`✅ Clé activée: ${keyUpper} → userId:${userId} role:${role} plan:${plan}`);
