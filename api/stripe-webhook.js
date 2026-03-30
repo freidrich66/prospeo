@@ -71,6 +71,32 @@ export default async function handler(req, res) {
 
         console.log(`✅ KEY individuelle: ${key} → ${email}`);
 
+        // ── Email au client avec sa clé ──
+        if (process.env.RESEND_API_KEY && (email || session.customer_email)) {
+          const toEmail = email || session.customer_email;
+          const expireStr = expiresAt.toLocaleDateString("fr-FR");
+          await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${process.env.RESEND_API_KEY}` },
+            body: JSON.stringify({
+              from: "Prospeo <contact@prospeo.me>",
+              to: [toEmail],
+              bcc: ["contact@synermo.fr"],
+              subject: "🔑 Votre licence Prospeo — Clé d'activation",
+              html: `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px">
+                <h2 style="color:#FF4C1A">◈ Prospeo — Votre licence</h2>
+                <p>Bonjour,</p>
+                <p>Merci pour votre achat ! Voici votre clé d'activation Prospeo :</p>
+                <div style="background:#F5F0E8;border-radius:10px;padding:20px;margin:16px 0;font-family:monospace;font-size:18px;text-align:center;letter-spacing:2px">
+                  <strong>${key}</strong>
+                </div>
+                <p>👉 Connectez-vous sur <a href="https://prospeo.me">prospeo.me</a> puis entrez cette clé dans l'onglet <strong>⭐ Abonnement</strong>.</p>
+                <p style="color:#888;font-size:12px">Expire le : ${expireStr}</p>
+              </div>`,
+            }),
+          }).catch(e => console.error("Email error:", e.message));
+        }
+
       } else {
         // ── N licences groupées ─────────────────────────────
         // Créer l'entreprise
@@ -108,6 +134,37 @@ export default async function handler(req, res) {
 
         await supabase.from("activation_keys").insert(keys);
         console.log(`✅ ${qty} KEYs générées pour ${email} (batch: ${batchId})`);
+
+        // ── Email au manager avec toutes les clés ──
+        if (process.env.RESEND_API_KEY && (email || session.customer_email)) {
+          const toEmail = email || session.customer_email;
+          const expireStr = expiresAt.toLocaleDateString("fr-FR");
+          const keyLines = keys.map((k, i) => {
+            const label = k.key_type === "manager" ? "🔑 Clé Manager" : `🔑 Clé Commercial ${i}`;
+            return `${label} : <code style="background:#fff;padding:2px 8px;border-radius:4px">${k.key}</code>`;
+          }).join("<br><br>");
+          await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${process.env.RESEND_API_KEY}` },
+            body: JSON.stringify({
+              from: "Prospeo <contact@prospeo.me>",
+              to: [toEmail],
+              bcc: ["contact@synermo.fr"],
+              subject: `🔑 Vos ${qty} licences Prospeo — Clés d'activation`,
+              html: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
+                <h2 style="color:#FF4C1A">◈ Prospeo — Vos ${qty} licences</h2>
+                <p>Bonjour,</p>
+                <p>Merci pour votre achat ! Voici votre pack de <strong>${qty} licences</strong> :</p>
+                <div style="background:#F5F0E8;border-radius:10px;padding:16px;margin:16px 0;line-height:2">
+                  ${keyLines}
+                </div>
+                <p>📌 Activez votre licence Manager sur <a href="https://prospeo.me">prospeo.me</a> → onglet ⭐ Abonnement.</p>
+                <p>Partagez les clés Commerciaux à vos collaborateurs.</p>
+                <p style="color:#888;font-size:12px">Expire le : ${expireStr}</p>
+              </div>`,
+            }),
+          }).catch(e => console.error("Email bulk error:", e.message));
+        }
       }
     } catch (err) {
       console.error("Erreur génération KEYs:", err.message);
