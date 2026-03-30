@@ -3253,7 +3253,7 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
     supabase.from("contact_notes")
       .select("*, contacts:contact_id(first_name,last_name,company,status), profiles:user_id(full_name,email)")
       .not("followup_date","is",null)
-      .lte("followup_date", new Date().toISOString().split("T")[0])
+      .lte("followup_date", (() => { const d = new Date(); d.setDate(d.getDate()+14); return d.toISOString().split("T")[0]; })())
       .order("followup_date", {ascending:true})
       .then(({data})=>setFollowups(data||[]));
     // Load all contact_notes with amounts for CA calculation
@@ -3403,9 +3403,24 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
     URL.revokeObjectURL(url);
   };
 
-  // ── Followup stats ──
-  const overdueFollowups = followups.filter(n=>new Date(n.followup_date)<new Date(new Date().toDateString()));
-  const todayFollowups   = followups.filter(n=>new Date(n.followup_date).toDateString()===new Date().toDateString());
+  // ── Followup stats — 4 horizons temporels ──
+  const todayDate   = new Date(new Date().toDateString()); // minuit aujourd'hui
+  const todayStr    = new Date().toDateString();
+
+  // Semaine en cours : lundi → dimanche
+  const startOfWeek = new Date(todayDate);
+  startOfWeek.setDate(todayDate.getDate() - (todayDate.getDay() === 0 ? 6 : todayDate.getDay() - 1));
+  const endOfWeek   = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+  // Semaine suivante
+  const startNextWeek = new Date(endOfWeek); startNextWeek.setDate(endOfWeek.getDate() + 1);
+  const endNextWeek   = new Date(startNextWeek); endNextWeek.setDate(startNextWeek.getDate() + 6);
+
+  const overdueFollowups  = followups.filter(n => new Date(n.followup_date) < todayDate);
+  const todayFollowups    = followups.filter(n => new Date(n.followup_date).toDateString() === todayStr);
+  const thisWeekFollowups = followups.filter(n => { const d = new Date(n.followup_date); return d > todayDate && d >= startOfWeek && d <= endOfWeek; });
+  const nextWeekFollowups = followups.filter(n => { const d = new Date(n.followup_date); return d >= startNextWeek && d <= endNextWeek; });
+  const fmtDateShort = d => new Date(d).toLocaleDateString("fr-FR", { weekday:"short", day:"numeric", month:"short" });
 
   const ProgressBar = ({ value, target, color="#FF4C1A" }) => {
     const pct = target > 0 ? Math.min(100, Math.round((value/target)*100)) : 0;
@@ -3439,9 +3454,11 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
         </div>
       </div>
 
-      {/* ── Relances ── */}
-      {(overdueFollowups.length > 0 || todayFollowups.length > 0) && (
+      {/* ── Relances : 4 horizons ── */}
+      {(overdueFollowups.length > 0 || todayFollowups.length > 0 || thisWeekFollowups.length > 0 || nextWeekFollowups.length > 0) && (
         <div style={{ marginBottom:16 }}>
+
+          {/* En retard */}
           {overdueFollowups.length > 0 && (
             <div style={{ background:"#FFF0F0", border:"2px solid #FF2D2D", borderRadius:12, padding:14, marginBottom:10 }}>
               <div style={{ fontSize:13, fontWeight:700, color:"#FF2D2D", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:8 }}>
@@ -3450,24 +3467,77 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
               {overdueFollowups.slice(0,5).map(n=>(
                 <div key={n.id} style={{ display:"flex", justifyContent:"space-between", padding:"5px 0", borderBottom:"1px solid #FFD0D0", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif" }}>
                   <span>{n.contacts?.first_name} {n.contacts?.last_name} {n.contacts?.company?`(${n.contacts.company})`:""}</span>
-                  <span style={{ color:"#FF2D2D", fontWeight:700 }}>📅 {new Date(n.followup_date).toLocaleDateString()}</span>
+                  <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                    <span style={{ color:"#888", fontSize:11 }}>{n.profiles?.full_name||n.profiles?.email||""}</span>
+                    <span style={{ color:"#FF2D2D", fontWeight:700 }}>📅 {fmtDateShort(n.followup_date)}</span>
+                  </div>
                 </div>
               ))}
+              {overdueFollowups.length > 5 && <div style={{ fontSize:11, color:"#FF2D2D", marginTop:6, fontFamily:"'Helvetica Neue',sans-serif" }}>+ {overdueFollowups.length-5} autre(s)…</div>}
             </div>
           )}
+
+          {/* Aujourd'hui */}
           {todayFollowups.length > 0 && (
-            <div style={{ background:"#FFF8F0", border:"2px solid #FF9500", borderRadius:12, padding:14 }}>
+            <div style={{ background:"#FFF8F0", border:"2px solid #FF9500", borderRadius:12, padding:14, marginBottom:10 }}>
               <div style={{ fontSize:13, fontWeight:700, color:"#FF9500", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:8 }}>
                 📅 {todayFollowups.length} relance{todayFollowups.length>1?"s":""} aujourd'hui
               </div>
               {todayFollowups.map(n=>(
                 <div key={n.id} style={{ display:"flex", justifyContent:"space-between", padding:"5px 0", borderBottom:"1px solid #FFE0B0", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif" }}>
                   <span>{n.contacts?.first_name} {n.contacts?.last_name} {n.contacts?.company?`(${n.contacts.company})`:""}</span>
-                  <span style={{ color:"#888", fontSize:11 }}>{n.profiles?.full_name||n.profiles?.email||"—"}</span>
+                  <span style={{ color:"#888", fontSize:11 }}>{n.profiles?.full_name||n.profiles?.email||""}</span>
                 </div>
               ))}
             </div>
           )}
+
+          {/* Cette semaine */}
+          {thisWeekFollowups.length > 0 && (
+            <div style={{ background:"#F0F6FF", border:"2px solid #1A6AFF", borderRadius:12, padding:14, marginBottom:10 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:"#1A6AFF", fontFamily:"'Helvetica Neue',sans-serif" }}>
+                  📆 Cette semaine — {thisWeekFollowups.length} relance{thisWeekFollowups.length>1?"s":""}
+                </div>
+                <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>
+                  {startOfWeek.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} → {endOfWeek.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}
+                </div>
+              </div>
+              {thisWeekFollowups.map(n=>(
+                <div key={n.id} style={{ display:"flex", justifyContent:"space-between", padding:"5px 0", borderBottom:"1px solid #BFDBFE", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif" }}>
+                  <span>{n.contacts?.first_name} {n.contacts?.last_name} {n.contacts?.company?`(${n.contacts.company})`:""}</span>
+                  <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                    <span style={{ color:"#888", fontSize:11 }}>{n.profiles?.full_name||n.profiles?.email||""}</span>
+                    <span style={{ color:"#1A6AFF", fontWeight:600 }}>📅 {fmtDateShort(n.followup_date)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Semaine suivante */}
+          {nextWeekFollowups.length > 0 && (
+            <div style={{ background:"#F5F3FF", border:"2px solid #8B5CF6", borderRadius:12, padding:14, marginBottom:10 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:"#8B5CF6", fontFamily:"'Helvetica Neue',sans-serif" }}>
+                  🗓 Semaine suivante — {nextWeekFollowups.length} relance{nextWeekFollowups.length>1?"s":""}
+                </div>
+                <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>
+                  {startNextWeek.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} → {endNextWeek.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}
+                </div>
+              </div>
+              {nextWeekFollowups.map(n=>(
+                <div key={n.id} style={{ display:"flex", justifyContent:"space-between", padding:"5px 0", borderBottom:"1px solid #DDD6FE", fontSize:12, fontFamily:"'Helvetica Neue',sans-serif" }}>
+                  <span>{n.contacts?.first_name} {n.contacts?.last_name} {n.contacts?.company?`(${n.contacts.company})`:""}</span>
+                  <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                    <span style={{ color:"#888", fontSize:11 }}>{n.profiles?.full_name||n.profiles?.email||""}</span>
+                    <span style={{ color:"#8B5CF6", fontWeight:600 }}>📅 {fmtDateShort(n.followup_date)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
         </div>
       )}
 
