@@ -1,12 +1,25 @@
-import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 
-const stripe   = new Stripe(process.env.STRIPE_SECRET_KEY);
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
+
+// Vérifie la signature Stripe avec crypto Node.js natif
+function verifyStripeSignature(rawBody, sig, secret) {
+  const parts = {};
+  sig.split(",").forEach(part => {
+    const [k, v] = part.split("=");
+    if (k === "t")  parts.timestamp = v;
+    if (k === "v1") parts.signature = v;
+  });
+  if (!parts.timestamp || !parts.signature) throw new Error("Invalid signature format");
+  const payload  = `${parts.timestamp}.${rawBody}`;
+  const expected = crypto.createHmac("sha256", secret).update(payload, "utf8").digest("hex");
+  if (expected !== parts.signature) throw new Error("Signature mismatch");
+  if (Math.abs(Date.now()/1000 - parseInt(parts.timestamp)) > 300) throw new Error("Timestamp too old");
+}
 
 export const config = { api: { bodyParser: false } };
 
@@ -32,7 +45,8 @@ export default async function handler(req, res) {
 
   let event;
   try {
-    event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    verifyStripeSignature(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    event = JSON.parse(rawBody);
   } catch (err) {
     console.error("Webhook sig error:", err.message);
     return res.status(400).json({ error: err.message });
