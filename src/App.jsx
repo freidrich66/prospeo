@@ -440,6 +440,79 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
   );
 }
 
+function FollowupsPanel({ profile, onSelect }) {
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    if (!profile?.id) return;
+    const today = new Date().toISOString().split("T")[0];
+    const d14 = new Date(); d14.setDate(d14.getDate()+14);
+    supabase.from("contact_notes")
+      .select("id,followup_date,content,contacts:contact_id(id,first_name,last_name,phone,company,status),projects:project_id(name)")
+      .eq("user_id", profile.id)
+      .not("followup_date","is",null)
+      .gte("followup_date", today)
+      .lte("followup_date", d14.toISOString().split("T")[0])
+      .order("followup_date",{ascending:true})
+      .then(({data})=>setItems(data||[]));
+  }, [profile?.id]);
+
+  if (items.length === 0) return null;
+
+  const now    = new Date();
+  const todayD = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayS = todayD.toDateString();
+  const dow    = todayD.getDay()===0?6:todayD.getDay()-1;
+  const mon0   = new Date(todayD); mon0.setDate(todayD.getDate()-dow);
+  const sun0   = new Date(mon0);   sun0.setDate(mon0.getDate()+6);
+  const mon1   = new Date(sun0);   mon1.setDate(sun0.getDate()+1);
+  const sun1   = new Date(mon1);   sun1.setDate(mon1.getDate()+6);
+  const fmt    = d => { try{return new Date(d).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"});}catch(e){return d;} };
+  const fmtR   = (a,b) => a.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})+" → "+b.toLocaleDateString("fr-FR",{day:"numeric",month:"short"});
+  const sd     = d => { try{return new Date(d);}catch(e){return new Date(0);} };
+
+  const overdueF = items.filter(n=>sd(n.followup_date)<todayD);
+  const todayF   = items.filter(n=>sd(n.followup_date).toDateString()===todayS);
+  const weekF    = items.filter(n=>{const d=sd(n.followup_date);return d>todayD&&d>=mon0&&d<=sun0;});
+  const nextF    = items.filter(n=>{const d=sd(n.followup_date);return d>=mon1&&d<=sun1;});
+
+  const Row = ({n,bc}) => (
+    <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"10px 0",borderBottom:`1px solid ${bc}`,cursor:n.contacts?.id?"pointer":"default"}}
+      onClick={()=>n.contacts?.id&&onSelect(n.contacts)}>
+      <div style={{width:36,height:36,borderRadius:"50%",background:"#1A1A1A",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,fontFamily:"'Helvetica Neue',sans-serif",flexShrink:0}}>
+        {((n.contacts?.first_name||"?")[0]).toUpperCase()}
+      </div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:13,fontWeight:700,fontFamily:"'Helvetica Neue',sans-serif",color:"#1A1A1A"}}>
+          {n.contacts?.first_name} {n.contacts?.last_name}
+          {n.contacts?.company&&<span style={{fontWeight:400,color:"#888",marginLeft:6}}>· {n.contacts.company}</span>}
+        </div>
+        <div style={{display:"flex",gap:10,marginTop:3,flexWrap:"wrap"}}>
+          {n.contacts?.phone&&<a href={`tel:${n.contacts.phone}`} style={{fontSize:11,color:"#1A6AFF",fontFamily:"'Helvetica Neue',sans-serif",textDecoration:"none",fontWeight:600}}>📞 {n.contacts.phone}</a>}
+          {n.projects?.name&&<span style={{fontSize:11,color:"#FF4C1A",fontFamily:"'Helvetica Neue',sans-serif"}}>📁 {n.projects.name}</span>}
+          {n.content&&<span style={{fontSize:11,color:"#888",fontFamily:"'Helvetica Neue',sans-serif"}}>💬 {n.content.slice(0,40)}{n.content.length>40?"…":""}</span>}
+        </div>
+      </div>
+      <div style={{fontSize:11,fontWeight:700,color:"#FF4C1A",fontFamily:"'Helvetica Neue',sans-serif",flexShrink:0}}>📅 {fmt(n.followup_date)}</div>
+    </div>
+  );
+
+  const Section = ({list,title,bg,border,bc}) => list.length===0?null:(
+    <div style={{background:bg,border:`2px solid ${border}`,borderRadius:14,padding:14,marginBottom:10}}>
+      <div style={{fontSize:13,fontWeight:700,color:border,fontFamily:"'Helvetica Neue',sans-serif",marginBottom:8}}>{title}</div>
+      {list.map(n=><Row key={n.id} n={n} bc={bc}/>)}
+    </div>
+  );
+
+  return (
+    <div style={{marginBottom:18}}>
+      <Section list={overdueF} title={`⚠️ ${overdueF.length} rappel${overdueF.length>1?"s":""} en retard`}            bg="#FFF0F0" border="#FF2D2D" bc="#FFD0D0"/>
+      <Section list={todayF}   title={`📅 ${todayF.length} rappel${todayF.length>1?"s":""} aujourd'hui`}               bg="#FFF8F0" border="#FF9500" bc="#FFE4B0"/>
+      <Section list={weekF}    title={`📆 Cette semaine — ${weekF.length} rappel${weekF.length>1?"s":""} · ${fmtR(mon0,sun0)}`}   bg="#F0F6FF" border="#1A6AFF" bc="#BFDBFE"/>
+      <Section list={nextF}    title={`🗓 Semaine suivante — ${nextF.length} rappel${nextF.length>1?"s":""} · ${fmtR(mon1,sun1)}`} bg="#F5F3FF" border="#8B5CF6" bc="#DDD6FE"/>
+    </div>
+  );
+}
+
 function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, lang="fr", subscription=null, globalSearch="", setGlobalSearch, onSelect }) {
   return (
     <div style={P(isMobile)}>
@@ -486,6 +559,10 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
           </div>
         ))}
       </div>
+
+      {/* ── RAPPELS S ET S+1 ── */}
+      <FollowupsPanel profile={profile} onSelect={onSelect} />
+
       {/* ── BARRE DE RECHERCHE GLOBALE ── */}
       {(() => {
         const q = globalSearch.trim().toLowerCase();
