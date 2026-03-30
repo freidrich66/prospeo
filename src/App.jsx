@@ -506,6 +506,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
         </nav>
       )}
     </div>
+    </ThemeContext.Provider>
   );
 }
 
