@@ -3233,6 +3233,7 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
   const [dbObjectives, setDbObjectives] = useState([]);
   const [allProfiles, setAllProfiles]   = useState([]);
   const [followups, setFollowups]       = useState([]);
+  const [allNotes, setAllNotes]         = useState([]);   // contact_notes avec montants
   const [objForm, setObjForm]     = useState({});
   const [savingObj, setSavingObj] = useState(false);
   const STATUS_COLORS = getStatusColors(lang);
@@ -3255,6 +3256,12 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
       .lte("followup_date", new Date().toISOString().split("T")[0])
       .order("followup_date", {ascending:true})
       .then(({data})=>setFollowups(data||[]));
+    // Load all contact_notes with amounts for CA calculation
+    supabase.from("contact_notes")
+      .select("id,user_id,amount,currency,contact_status,created_at,contacts:contact_id(status)")
+      .not("amount","is",null)
+      .gt("amount",0)
+      .then(({data})=>setAllNotes(data||[]));
   }, []);
 
   // ── Period filter ──
@@ -3277,6 +3284,39 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
     converti: filtered.filter(c=>c.status==="converti").length,
   };
   const convRate = stats.total > 0 ? Math.round((stats.converti/stats.total)*100) : 0;
+
+  // ── CA helpers ──
+  // Filtre les notes selon la période sélectionnée
+  const filteredNotes = allNotes.filter(n => {
+    const d = new Date(n.created_at);
+    if (period === "week") {
+      const w = new Date(now); w.setDate(now.getDate()-7); return d >= w;
+    }
+    return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+  });
+
+  // CA total équipe (toutes devises converties en € approximatif — EUR gardé brut, autres ignorés pour simplifier)
+  const caTotal = filteredNotes.filter(n=>n.currency==="EUR"||!n.currency).reduce((s,n)=>s+(n.amount||0),0);
+
+  // CA par statut contact
+  const caParStatut = {
+    chaud:    filteredNotes.filter(n=>n.contacts?.status==="chaud").reduce((s,n)=>s+(n.amount||0),0),
+    converti: filteredNotes.filter(n=>n.contacts?.status==="converti").reduce((s,n)=>s+(n.amount||0),0),
+    tiede:    filteredNotes.filter(n=>n.contacts?.status==="tiede").reduce((s,n)=>s+(n.amount||0),0),
+    froid:    filteredNotes.filter(n=>n.contacts?.status==="froid").reduce((s,n)=>s+(n.amount||0),0),
+  };
+
+  // CA par commercial (userId → montant)
+  const caByRep = {};
+  filteredNotes.forEach(n => {
+    if (!n.user_id) return;
+    caByRep[n.user_id] = (caByRep[n.user_id] || 0) + (n.amount || 0);
+  });
+
+  // Formatage CA
+  const fmtCA = (v) => v >= 1000
+    ? (v/1000).toLocaleString("fr-FR",{maximumFractionDigits:1}) + " k€"
+    : v.toLocaleString("fr-FR",{maximumFractionDigits:0}) + " €";
 
   // ── Period keys ──
   const monthKey   = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
@@ -3304,9 +3344,13 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
   }).forEach(c => {
     const uid = c.user_id || c.profiles?.id || "unknown";
     const name = displayName(c.profiles) || "—";
-    if (!byRepId[uid]) byRepId[uid] = { name, total:0, froid:0, tiede:0, chaud:0, converti:0, userId:uid };
+    if (!byRepId[uid]) byRepId[uid] = { name, total:0, froid:0, tiede:0, chaud:0, converti:0, userId:uid, ca:0 };
     byRepId[uid].total++;
     byRepId[uid][c.status] = (byRepId[uid][c.status]||0)+1;
+  });
+  // Attach CA to each rep
+  Object.keys(byRepId).forEach(uid => {
+    byRepId[uid].ca = caByRep[uid] || 0;
   });
   const repList = Object.values(byRepId).sort((a,b)=>b.total-a.total);
 
@@ -3341,14 +3385,18 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
   // ── Export Excel ──
   const exportExcel = () => {
     let csv = "\uFEFF";
-    csv += ["Commercial","Total","Froid","Tiède","Chaud","Converti","Tx Conv%","Obj Mensuel","Obj Trimestriel","Obj Annuel"].join(";")+"\n";
+    csv += ["Commercial","Total","Froid","Tiède","Chaud","Converti","Tx Conv%","CA (€)","CA Obj Mensuel (€)","Obj Mensuel","Obj Trimestriel","Obj Annuel"].join(";")+"\n";
     repList.forEach(r => {
       const conv = r.total>0?Math.round((r.converti/r.total)*100):0;
       const om = getObj(r.userId,"monthly",monthKey);
       const oq = getObj(r.userId,"quarterly",quarterKey);
       const oa = getObj(r.userId,"annual",yearKey);
-      csv += [r.name,r.total,r.froid,r.tiede,r.chaud,r.converti,conv+"%",om||"—",oq||"—",oa||"—"].join(";")+"\n";
+      const caObj = getObj(r.userId,"ca_monthly",monthKey);
+      csv += [r.name,r.total,r.froid,r.tiede,r.chaud,r.converti,conv+"%",Math.round(r.ca),caObj||"—",om||"—",oq||"—",oa||"—"].join(";")+"\n";
     });
+    // Total ligne
+    const totalCA = repList.reduce((s,r)=>s+r.ca,0);
+    csv += ["TOTAL","","","","","","",Math.round(totalCA),"","","",""].join(";")+"\n";
     const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href=url; a.download=`objectifs-${monthKey}.csv`; a.click();
@@ -3438,7 +3486,9 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
                 <div style={{ fontSize:13, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A", marginBottom:8 }}>
                   👤 {displayName(rep)}
                 </div>
-                <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)", gap:8 }}>
+                {/* Objectifs prospects */}
+                <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:6, fontWeight:600 }}>📊 Objectifs prospects</div>
+                <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)", gap:8, marginBottom:10 }}>
                   {[
                     { key:"monthly",   label:t("mgr_monthly",lang),   auto:null },
                     { key:"weekly",    label:"Sem.",                   auto:monthly>0?Math.round(monthly/4):0 },
@@ -3468,6 +3518,19 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
                     </div>
                   ))}
                 </div>
+                {/* Objectif CA mensuel */}
+                <div style={{ fontSize:11, color:"#1A6AFF", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:6, fontWeight:600 }}>💰 Objectif CA mensuel (€)</div>
+                <div style={{ maxWidth:200 }}>
+                  <input style={{ ...I, padding:"8px 10px" }} type="number" min="0" placeholder="Ex: 50000"
+                    value={repForm.ca_monthly||getObj(rep.id,"ca_monthly",monthKey)||""}
+                    onChange={e=>{
+                      setObjForm(p=>({
+                        ...p,
+                        [rep.id]: { ...(p[rep.id]||{}), ca_monthly: e.target.value }
+                      }));
+                    }}
+                  />
+                </div>
               </div>
             );
           })}
@@ -3487,37 +3550,56 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
       </div>
 
       {/* ── KPIs globaux ── */}
-      <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(5,1fr)", gap:10, marginBottom:16 }}>
+      <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(6,1fr)", gap:10, marginBottom:16 }}>
         {[
           { label:t("mgr_prospects_added",lang), value:stats.total,    bg:"#1A1A1A", fg:"#E8E0D4" },
           { label:STATUS_COLORS.froid?.label,    value:stats.froid,    bg:STATUS_COLORS.froid?.bg,    fg:STATUS_COLORS.froid?.text    },
           { label:STATUS_COLORS.tiede?.label,    value:stats.tiede,    bg:STATUS_COLORS.tiede?.bg,    fg:STATUS_COLORS.tiede?.text    },
           { label:STATUS_COLORS.chaud?.label,    value:stats.chaud,    bg:STATUS_COLORS.chaud?.bg,    fg:STATUS_COLORS.chaud?.text    },
           { label:STATUS_COLORS.converti?.label, value:stats.converti, bg:STATUS_COLORS.converti?.bg, fg:STATUS_COLORS.converti?.text },
+          { label:"💰 CA équipe",                value:fmtCA(caTotal), bg:"#1A6AFF",  fg:"#fff",  isCA:true },
         ].map(k=>(
           <div key={k.label} style={{ background:k.bg, borderRadius:12, padding:14 }}>
-            <div style={{ fontSize:28, fontWeight:700, color:k.fg, lineHeight:1 }}>{k.value}</div>
+            <div style={{ fontSize:k.isCA?18:28, fontWeight:700, color:k.fg, lineHeight:1 }}>{k.value}</div>
             <div style={{ fontSize:10, color:k.fg, opacity:0.8, fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5, marginTop:4 }}>{k.label}</div>
           </div>
         ))}
       </div>
 
+      {/* CA par statut */}
+      {caTotal > 0 && (
+        <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)", gap:8, marginBottom:16 }}>
+          {[
+            { label:"CA Froid",    value:caParStatut.froid,    bg:STATUS_COLORS.froid?.bg,    fg:STATUS_COLORS.froid?.text    },
+            { label:"CA Tiède",    value:caParStatut.tiede,    bg:STATUS_COLORS.tiede?.bg,    fg:STATUS_COLORS.tiede?.text    },
+            { label:"CA Chaud 🔥", value:caParStatut.chaud,    bg:STATUS_COLORS.chaud?.bg,    fg:STATUS_COLORS.chaud?.text    },
+            { label:"CA Converti ✅",value:caParStatut.converti,bg:STATUS_COLORS.converti?.bg, fg:STATUS_COLORS.converti?.text },
+          ].map(k=>(
+            <div key={k.label} style={{ background:k.bg, borderRadius:10, padding:"10px 12px" }}>
+              <div style={{ fontSize:15, fontWeight:700, color:k.fg, lineHeight:1 }}>{fmtCA(k.value)}</div>
+              <div style={{ fontSize:9, color:k.fg, opacity:0.8, fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5, marginTop:3 }}>{k.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ── Objectifs & Progression ── */}
-      <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr 1fr", gap:12, marginBottom:16 }}>
+      <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"repeat(4,1fr)", gap:12, marginBottom:16 }}>
         {[
           { label:t("mgr_monthly",lang),   value:stats.total,  target:repList.reduce((s,r)=>s+getObj(r.userId,"monthly",monthKey),0),   note:`${now.toLocaleDateString([],{month:"long"})}` },
           { label:t("mgr_quarterly",lang), value:quarterTotal, target:repList.reduce((s,r)=>s+getObj(r.userId,"quarterly",quarterKey),0), note:`Q${Math.ceil((now.getMonth()+1)/3)} ${now.getFullYear()}` },
           { label:t("mgr_annual",lang),    value:annualTotal,  target:repList.reduce((s,r)=>s+getObj(r.userId,"annual",yearKey),0),       note:`${now.getFullYear()}` },
+          { label:"💰 CA vs Objectif",     value:caTotal,      target:repList.reduce((s,r)=>s+getObj(r.userId,"ca_monthly",monthKey),0),  note:`${now.toLocaleDateString([],{month:"long"})}`, isCA:true },
         ].map(obj=>(
           <div key={obj.label} style={C}>
             <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10 }}>
               <div>
-                <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:1, fontWeight:600 }}>{obj.label}</div>
+                <div style={{ fontSize:11, color:obj.isCA?"#1A6AFF":"#888", fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:1, fontWeight:600 }}>{obj.label}</div>
                 <div style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif" }}>{obj.note}</div>
               </div>
-              <div style={{ fontSize:22, fontWeight:700, color:"#1A1A1A" }}>{obj.value}</div>
+              <div style={{ fontSize:obj.isCA?16:22, fontWeight:700, color:"#1A1A1A" }}>{obj.isCA?fmtCA(obj.value):obj.value}</div>
             </div>
-            <ProgressBar value={obj.value} target={obj.target} />
+            <ProgressBar value={obj.value} target={obj.target} color={obj.isCA?"#1A6AFF":"#FF4C1A"} />
             {!obj.target && (
               <div style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", marginTop:6, fontStyle:"italic" }}>
                 {t("mgr_set_obj",lang)} →
@@ -3585,15 +3667,22 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
           <div>
             {repList.map(r => {
               const repConv = r.total > 0 ? Math.round((r.converti/r.total)*100) : 0;
-              const objM = getObj(r.userId,"monthly",monthKey);
-              const pct  = objM > 0 ? Math.min(100, Math.round((r.total/objM)*100)) : null;
+              const objM    = getObj(r.userId,"monthly",monthKey);
+              const pct     = objM > 0 ? Math.min(100, Math.round((r.total/objM)*100)) : null;
+              const caObjM  = getObj(r.userId,"ca_monthly",monthKey);
+              const caPct   = caObjM > 0 ? Math.min(100, Math.round((r.ca/caObjM)*100)) : null;
               return (
                 <div key={r.userId} style={{ padding:"12px 0", borderBottom:"1px solid #F0EBE0" }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
                     <div style={{ fontSize:14, fontWeight:600, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>{r.name}</div>
-                    <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                    <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap" }}>
                       <span style={{ fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#888" }}>{r.total} prospects</span>
                       <span style={{ fontSize:11, fontWeight:700, color:"#00C48C", background:"#EBF8F4", padding:"2px 8px", borderRadius:20, fontFamily:"'Helvetica Neue',sans-serif" }}>{repConv}% conv.</span>
+                      {r.ca > 0 && (
+                        <span style={{ fontSize:11, fontWeight:700, color:"#1A6AFF", background:"#EEF6FF", padding:"2px 8px", borderRadius:20, fontFamily:"'Helvetica Neue',sans-serif" }}>
+                          💰 {fmtCA(r.ca)}
+                        </span>
+                      )}
                     </div>
                   </div>
                   {/* Barre statuts */}
@@ -3602,15 +3691,27 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
                       r[st] > 0 && <div key={st} style={{ flex:r[st], background:STATUS_COLORS[st]?.bg }} />
                     ))}
                   </div>
-                  {/* Objectif mensuel */}
+                  {/* Objectif prospects mensuel */}
                   {objM > 0 && (
                     <div style={{ marginTop:6 }}>
                       <div style={{ display:"flex", justifyContent:"space-between", marginBottom:2 }}>
-                        <span style={{ fontSize:10, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>Obj. mensuel: {r.total}/{objM}</span>
+                        <span style={{ fontSize:10, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>Obj. prospects: {r.total}/{objM}</span>
                         <span style={{ fontSize:10, fontWeight:700, color:pct>=100?"#00C48C":"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>{pct}%</span>
                       </div>
                       <div style={{ height:5, background:"#F0EBE0", borderRadius:3, overflow:"hidden" }}>
                         <div style={{ height:"100%", width:`${pct}%`, background:pct>=100?"#00C48C":"#FF4C1A", borderRadius:3 }} />
+                      </div>
+                    </div>
+                  )}
+                  {/* Objectif CA mensuel */}
+                  {caObjM > 0 && (
+                    <div style={{ marginTop:6 }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:2 }}>
+                        <span style={{ fontSize:10, color:"#1A6AFF", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}>💰 CA: {fmtCA(r.ca)} / {fmtCA(caObjM)}</span>
+                        <span style={{ fontSize:10, fontWeight:700, color:caPct>=100?"#00C48C":"#1A6AFF", fontFamily:"'Helvetica Neue',sans-serif" }}>{caPct}%</span>
+                      </div>
+                      <div style={{ height:5, background:"#EEF6FF", borderRadius:3, overflow:"hidden" }}>
+                        <div style={{ height:"100%", width:`${caPct}%`, background:caPct>=100?"#00C48C":"#1A6AFF", borderRadius:3 }} />
                       </div>
                     </div>
                   )}
