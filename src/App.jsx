@@ -1,6 +1,22 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, createContext, useContext } from "react";
 import { supabase } from "./supabase.js";
 import { LANGUAGES, t, detectBrowserLang, getSavedLang, saveLang } from "./i18n.js";
+
+// ── Thèmes ───────────────────────────────────────────────────
+const THEMES = [
+  { id:"sand",    name:{fr:"Sable",   en:"Sand",    es:"Arena",  pt:"Areia",   it:"Sabbia", de:"Sand",     no:"Sand",   sv:"Sand",   nl:"Zand",   zh:"沙色"  }, bg:"F5F0E8", sidebar:"1A1A1A", accent:"FF4C1A", card:"FFFFFF", cardBorder:"F0EBE3", text:"1A1A1A", subtext:"888888", inputBorder:"E8E0D4", preview:["F5F0E8","FF4C1A","1A1A1A"] },
+  { id:"slate",   name:{fr:"Ardoise", en:"Slate",   es:"Pizarra",pt:"Ardósia", it:"Ardesia",de:"Schiefer", no:"Skifer", sv:"Skiffer",nl:"Leisteen",zh:"石板"  }, bg:"EEF2F7", sidebar:"2D3748", accent:"3B82F6", card:"FFFFFF", cardBorder:"E2E8F0", text:"1A202C", subtext:"718096", inputBorder:"CBD5E0", preview:["EEF2F7","3B82F6","2D3748"] },
+  { id:"forest",  name:{fr:"Forêt",   en:"Forest",  es:"Bosque", pt:"Floresta",it:"Foresta",de:"Wald",     no:"Skog",   sv:"Skog",   nl:"Woud",   zh:"森林"  }, bg:"EDF5EF", sidebar:"1A3D2B", accent:"10B981", card:"FFFFFF", cardBorder:"D1FAE5", text:"1A3D2B", subtext:"6B7280", inputBorder:"A7F3D0", preview:["EDF5EF","10B981","1A3D2B"] },
+  { id:"night",   name:{fr:"Nuit",    en:"Night",   es:"Noche",  pt:"Noite",   it:"Notte",  de:"Nacht",    no:"Natt",   sv:"Natt",   nl:"Nacht",  zh:"夜晚"  }, bg:"1A1A2E", sidebar:"16213E", accent:"E94560", card:"242435", cardBorder:"2D2D45", text:"E8E0D4", subtext:"9CA3AF", inputBorder:"3A3A5C", preview:["1A1A2E","E94560","16213E"] },
+  { id:"lavande", name:{fr:"Lavande", en:"Lavender",es:"Lavanda",pt:"Lavanda", it:"Lavanda",de:"Lavendel", no:"Lavendel",sv:"Lavendel",nl:"Lavendel",zh:"薰衣草"}, bg:"F5F3FF", sidebar:"4C1D95", accent:"8B5CF6", card:"FFFFFF", cardBorder:"DDD6FE", text:"1A1A1A", subtext:"6B7280", inputBorder:"C4B5FD", preview:["F5F3FF","8B5CF6","4C1D95"] },
+  { id:"rose",    name:{fr:"Rose",    en:"Rose",    es:"Rosa",   pt:"Rosa",    it:"Rosa",   de:"Rosa",     no:"Rose",   sv:"Rosa",   nl:"Roze",   zh:"玫瑰"  }, bg:"FFF5F7", sidebar:"831843", accent:"EC4899", card:"FFFFFF", cardBorder:"FCE7F3", text:"1A1A1A", subtext:"6B7280", inputBorder:"F9A8D4", preview:["FFF5F7","EC4899","831843"] },
+];
+const DEFAULT_THEME = THEMES[0];
+function getTheme(id) { return THEMES.find(th=>th.id===id) || DEFAULT_THEME; }
+const ThemeContext = createContext({ theme: DEFAULT_THEME, applyTheme: ()=>{} });
+const useTheme = () => useContext(ThemeContext);
+function loadSavedTheme() { try { return localStorage.getItem("prospeo_theme") || "sand"; } catch(e) { return "sand"; } }
+function saveThemeLocal(id) { try { localStorage.setItem("prospeo_theme", id); } catch(e) {} }
 
 const STATUS_COLORS_BASE = {
   froid:    { bg: "#E8E0D4", text: "#888", key: "status_froid"    },
@@ -183,6 +199,11 @@ const globalCSS = `
   input, textarea { -webkit-appearance: none; appearance: none; }
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
+  :root {
+    --c-bg: #F5F0E8; --c-accent: #FF4C1A; --c-sidebar: #1A1A1A;
+    --c-card: #FFFFFF; --c-border: #F0EBE3; --c-text: #1A1A1A;
+    --c-subtext: #888888; --c-input-border: #E8E0D4;
+  }
 `;
 
 export default function App() {
@@ -275,7 +296,35 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
   const [loadingData, setLoadingData]   = useState(true);
   const [subscription, setSubscription] = useState(null);
   const [globalSearch, setGlobalSearch] = useState("");
+  const [themeId, setThemeId]           = useState(() => loadSavedTheme());
+  const theme = getTheme(themeId);
   const isMobile = useIsMobile();
+
+  // Injecte les variables CSS du thème
+  useEffect(() => {
+    const r = document.documentElement;
+    r.style.setProperty("--c-bg",           "#"+theme.bg);
+    r.style.setProperty("--c-accent",       "#"+theme.accent);
+    r.style.setProperty("--c-sidebar",      "#"+theme.sidebar);
+    r.style.setProperty("--c-card",         "#"+theme.card);
+    r.style.setProperty("--c-border",       "#"+theme.cardBorder);
+    r.style.setProperty("--c-text",         "#"+theme.text);
+    r.style.setProperty("--c-subtext",      "#"+theme.subtext);
+    r.style.setProperty("--c-input-border", "#"+theme.inputBorder);
+    document.body.style.background = "#"+theme.bg;
+  }, [themeId]);
+
+  // Charge le thème Supabase au démarrage
+  useEffect(() => {
+    if (profile?.theme && profile.theme !== themeId) {
+      setThemeId(profile.theme); saveThemeLocal(profile.theme);
+    }
+  }, [profile?.theme]);
+
+  const applyTheme = (id) => {
+    setThemeId(id); saveThemeLocal(id);
+    if (profile?.id) supabase.from("profiles").update({theme:id}).eq("id",profile.id);
+  };
 
   const notify = (msg, type="success") => { setNotif({msg,type}); setTimeout(()=>setNotif(null),3000); };
 
@@ -349,7 +398,8 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
   }
 
   return (
-    <div style={{ display:"flex", minHeight:"100vh", background:"#F5F0E8", fontFamily:"Georgia,serif" }}>
+    <ThemeContext.Provider value={{ theme, applyTheme }}>
+    <div style={{ display:"flex", minHeight:"100vh", background:"var(--c-bg)", fontFamily:"Georgia,serif" }}>
 
       {notif && (
         <div style={{ position:"fixed", top:isMobile?64:24, left:"50%", transform:"translateX(-50%)", zIndex:2000, padding:"11px 22px", borderRadius:30, color:"#fff", background:notif.type==="error"?"#FF2D2D":"#00C48C", fontFamily:"'Helvetica Neue',sans-serif", fontSize:13, fontWeight:600, boxShadow:"0 4px 20px rgba(0,0,0,0.2)", whiteSpace:"nowrap", animation:"slideUp 0.2s ease" }}>
@@ -359,7 +409,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
 
       {/* Desktop sidebar */}
       {!isMobile && (
-        <aside style={{ width:240, minHeight:"100vh", background:"#1A1A1A", display:"flex", flexDirection:"column", padding:"28px 0", flexShrink:0, position:"sticky", top:0, height:"100vh" }}>
+        <aside style={{ width:240, minHeight:"100vh", background:"var(--c-sidebar)", display:"flex", flexDirection:"column", padding:"28px 0", flexShrink:0, position:"sticky", top:0, height:"100vh" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, padding:"0 24px 22px", borderBottom:"1px solid #2A2A2A", marginBottom:14 }}>
             <span style={{ fontSize:22, color:"#FF4C1A" }}>◈</span>
             <span style={{ fontSize:17, fontWeight:700, letterSpacing:4, color:"#E8E0D4", fontFamily:"'Helvetica Neue',sans-serif" }}>PROSPEO</span>
@@ -394,7 +444,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
 
       {/* Mobile top bar */}
       {isMobile && (
-        <div style={{ position:"fixed", top:0, left:0, right:0, zIndex:100, background:"#1A1A1A", padding:"0 16px", height:54, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <div style={{ position:"fixed", top:0, left:0, right:0, zIndex:100, background:"var(--c-sidebar)", padding:"0 16px", height:54, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <span style={{ fontSize:17, color:"#FF4C1A" }}>◈</span>
             <span style={{ fontSize:15, fontWeight:700, letterSpacing:3, color:"#E8E0D4", fontFamily:"'Helvetica Neue',sans-serif" }}>PROSPEO</span>
@@ -413,7 +463,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
         {view==="list"      && <ListView contacts={contacts} profile={profile} loadingData={loadingData} isMobile={isMobile} lang={lang} onSelect={c=>{setSelected(c);setView("detail");}} onAdd={()=>go("add")} />}
         {view==="detail" && selected && <DetailView contact={selected} profile={profile} isMobile={isMobile} lang={lang} onBack={()=>setView("list")} onStatusUpdate={handleStatusUpdate} onDelete={handleDelete} notify={notify} />}
         {view==="report"    && <ReportView contacts={contacts} profile={profile} isMobile={isMobile} lang={lang} globalSearch={globalSearch} setGlobalSearch={setGlobalSearch} notify={notify} onSelectContact={c=>{setSelected(c);setView("detail");}} />}
-        {view==="profile"       && <ProfileView profile={profile} isMobile={isMobile} notify={notify} lang={lang} changeLang={changeLang} onUpdated={(p)=>{ setProfile(p); }} />}
+        {view==="profile"       && <ProfileView profile={profile} isMobile={isMobile} notify={notify} lang={lang} changeLang={changeLang} theme={theme} applyTheme={applyTheme} onUpdated={(p)=>{ setProfile(p); }} />}
         {view==="subscription"  && <SubscriptionView profile={profile} subscription={subscription} isMobile={isMobile} lang={lang} notify={notify} onActivated={loadSubscription} />}
         {view==="activate"      && <ActivateKeyView profile={profile} isMobile={isMobile} lang={lang} notify={notify} onActivated={()=>{ loadSubscription(); setView("dashboard"); }} />}
         {view==="superadmin" && isSuperManager(profile) && <SuperAdminView profile={profile} isMobile={isMobile} lang={lang} notify={notify} />}
@@ -427,7 +477,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
 
       {/* Mobile bottom nav */}
       {isMobile && (
-        <nav style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:100, background:"#1A1A1A", display:"flex", borderTop:"1px solid #222", paddingBottom:"env(safe-area-inset-bottom,0px)" }}>
+        <nav style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:100, background:"var(--c-sidebar)", display:"flex", borderTop:"1px solid #222", paddingBottom:"env(safe-area-inset-bottom,0px)" }}>
           {NAV.map(item => (
             <button key={item.id} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:3, padding:"9px 4px 7px", border:"none", background:"transparent", cursor:"pointer", color:view===item.id?"#FF4C1A":"#555" }} onClick={()=>go(item.id)}>
               <span style={{ fontSize:20 }}>{item.icon}</span>
@@ -437,6 +487,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
         </nav>
       )}
     </div>
+    </ThemeContext.Provider>
   );
 }
 
@@ -1879,7 +1930,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
   );
 }
 
-function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, onUpdated }) {
+function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, theme, applyTheme, onUpdated }) {
   const [form, setForm] = useState({
     first_name: "",
     last_name:  "",
@@ -2057,6 +2108,31 @@ function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, onUpdat
                 {l.flag} {l.label}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* ── Sélecteur de thème ── */}
+        <div style={{ marginTop:20, padding:"16px 0", borderTop:"1px solid #F0EBE0" }}>
+          <label style={L}>🎨 Thème de l'application</label>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginTop:10 }}>
+            {THEMES.map(th => {
+              const isActive = (theme?.id || "sand") === th.id;
+              return (
+                <button key={th.id}
+                  onClick={()=>applyTheme && applyTheme(th.id)}
+                  style={{ border:`2px solid ${isActive?"#"+th.accent:"#D0D0D0"}`, borderRadius:12, padding:"10px 8px", background:"#"+th.bg, cursor:"pointer", outline:"none", transition:"all 0.15s", boxShadow:isActive?"0 0 0 3px #"+th.accent+"40":"none" }}>
+                  <div style={{ display:"flex", gap:4, marginBottom:7, justifyContent:"center" }}>
+                    {th.preview.map((col,i)=>(
+                      <div key={i} style={{ width:18, height:18, borderRadius:"50%", background:"#"+col, border:"1px solid rgba(0,0,0,0.1)" }} />
+                    ))}
+                  </div>
+                  <div style={{ fontSize:12, fontWeight:isActive?700:400, color:"#"+th.text, fontFamily:"'Helvetica Neue',sans-serif" }}>
+                    {th.name[lang] || th.name.fr}
+                  </div>
+                  {isActive && <div style={{ fontSize:10, color:"#"+th.accent, fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>✓ Actif</div>}
+                </button>
+              );
+            })}
           </div>
         </div>
 
