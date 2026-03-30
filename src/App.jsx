@@ -2,6 +2,28 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "./supabase.js";
 import { LANGUAGES, t, detectBrowserLang, getSavedLang, saveLang } from "./i18n.js";
 
+// ── Thèmes de l'application ──────────────────────────────────
+const THEMES = [
+  { id:"sand",    name:"Sable",       bg:"F5F0E8", sidebar:"1A1A1A", accent:"FF4C1A", card:"FFFFFF", text:"1A1A1A", preview:["F5F0E8","FF4C1A","1A1A1A"] },
+  { id:"slate",   name:"Ardoise",     bg:"F0F4F8", sidebar:"2D3748", accent:"3B82F6", card:"FFFFFF", text:"1A202C", preview:["F0F4F8","3B82F6","2D3748"] },
+  { id:"forest",  name:"Forêt",       bg:"F0F5F1", sidebar:"1A3D2B", accent:"10B981", card:"FFFFFF", text:"1A3D2B", preview:["F0F5F1","10B981","1A3D2B"] },
+  { id:"night",   name:"Nuit",        bg:"1A1A2E", sidebar:"16213E", accent:"E94560", card:"242435", text:"E8E0D4", preview:["1A1A2E","E94560","16213E"] },
+  { id:"lavande", name:"Lavande",     bg:"F5F3FF", sidebar:"4C1D95", accent:"8B5CF6", card:"FFFFFF", text:"1A1A1A", preview:["F5F3FF","8B5CF6","4C1D95"] },
+  { id:"rose",    name:"Rose",        bg:"FFF5F7", sidebar:"831843", accent:"EC4899", card:"FFFFFF", text:"1A1A1A", preview:["FFF5F7","EC4899","831843"] },
+];
+
+const DEFAULT_THEME = THEMES[0];
+
+function getTheme(id) { return THEMES.find(t=>t.id===id) || DEFAULT_THEME; }
+
+function loadSavedTheme() {
+  try { return localStorage.getItem("prospeo_theme") || "sand"; } catch(e) { return "sand"; }
+}
+
+function saveThemeLocal(id) {
+  try { localStorage.setItem("prospeo_theme", id); } catch(e) {}
+}
+
 const STATUS_COLORS_BASE = {
   froid:    { bg: "#E8E0D4", text: "#888", key: "status_froid"    },
   tiede:    { bg: "#FF9500", text: "#fff", key: "status_tiede"    },
@@ -275,7 +297,31 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
   const [loadingData, setLoadingData]   = useState(true);
   const [subscription, setSubscription] = useState(null);
   const [globalSearch, setGlobalSearch] = useState("");
+  const [themeId, setThemeId]           = useState(() => loadSavedTheme());
+  const theme = getTheme(themeId);
   const isMobile = useIsMobile();
+
+  // Applique la couleur de fond sur le body
+  useEffect(() => {
+    document.body.style.background = "#" + theme.bg;
+    return () => { document.body.style.background = ""; };
+  }, [theme.bg]);
+
+  // Charge le thème sauvegardé dans Supabase au démarrage
+  useEffect(() => {
+    if (profile?.theme && profile.theme !== themeId) {
+      setThemeId(profile.theme);
+      saveThemeLocal(profile.theme);
+    }
+  }, [profile?.theme]);
+
+  const applyTheme = async (id) => {
+    setThemeId(id);
+    saveThemeLocal(id);
+    if (profile?.id) {
+      supabase.from("profiles").update({ theme: id }).eq("id", profile.id);
+    }
+  };
 
   const notify = (msg, type="success") => { setNotif({msg,type}); setTimeout(()=>setNotif(null),3000); };
 
@@ -349,7 +395,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
   }
 
   return (
-    <div style={{ display:"flex", minHeight:"100vh", background:"#F5F0E8", fontFamily:"Georgia,serif" }}>
+    <div style={{ display:"flex", minHeight:"100vh", background:"#"+theme.bg, fontFamily:"Georgia,serif" }}>
 
       {notif && (
         <div style={{ position:"fixed", top:isMobile?64:24, left:"50%", transform:"translateX(-50%)", zIndex:2000, padding:"11px 22px", borderRadius:30, color:"#fff", background:notif.type==="error"?"#FF2D2D":"#00C48C", fontFamily:"'Helvetica Neue',sans-serif", fontSize:13, fontWeight:600, boxShadow:"0 4px 20px rgba(0,0,0,0.2)", whiteSpace:"nowrap", animation:"slideUp 0.2s ease" }}>
@@ -413,7 +459,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
         {view==="list"      && <ListView contacts={contacts} profile={profile} loadingData={loadingData} isMobile={isMobile} lang={lang} onSelect={c=>{setSelected(c);setView("detail");}} onAdd={()=>go("add")} />}
         {view==="detail" && selected && <DetailView contact={selected} profile={profile} isMobile={isMobile} lang={lang} onBack={()=>setView("list")} onStatusUpdate={handleStatusUpdate} onDelete={handleDelete} notify={notify} />}
         {view==="report"    && <ReportView contacts={contacts} profile={profile} isMobile={isMobile} lang={lang} globalSearch={globalSearch} setGlobalSearch={setGlobalSearch} notify={notify} onSelectContact={c=>{setSelected(c);setView("detail");}} />}
-        {view==="profile"       && <ProfileView profile={profile} isMobile={isMobile} notify={notify} lang={lang} changeLang={changeLang} onUpdated={(p)=>{ setProfile(p); }} />}
+        {view==="profile"       && <ProfileView profile={profile} isMobile={isMobile} notify={notify} lang={lang} changeLang={changeLang} theme={theme} applyTheme={applyTheme} onUpdated={(p)=>{ setProfile(p); }} />}
         {view==="subscription"  && <SubscriptionView profile={profile} subscription={subscription} isMobile={isMobile} lang={lang} notify={notify} onActivated={loadSubscription} />}
         {view==="activate"      && <ActivateKeyView profile={profile} isMobile={isMobile} lang={lang} notify={notify} onActivated={()=>{ loadSubscription(); setView("dashboard"); }} />}
         {view==="superadmin" && isSuperManager(profile) && <SuperAdminView profile={profile} isMobile={isMobile} lang={lang} notify={notify} />}
@@ -440,109 +486,113 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
   );
 }
 
-function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, lang="fr", subscription=null, globalSearch="", setGlobalSearch, onSelect }) {
-  const [upcomingFollowups, setUpcomingFollowups] = useState([]);
-
+function FollowupsPanel({ profile, onSelect, theme }) {
+  const [items, setItems] = useState([]);
   useEffect(() => {
     if (!profile?.id) return;
-    // Charger les relances S et S+1 (aujourd'hui + 14 jours)
     const today = new Date().toISOString().split("T")[0];
-    const twoWeeks = new Date(); twoWeeks.setDate(twoWeeks.getDate()+14);
-    const twoWeeksStr = twoWeeks.toISOString().split("T")[0];
+    const d14 = new Date(); d14.setDate(d14.getDate()+14);
     supabase.from("contact_notes")
-      .select("id,followup_date,content,contact_type,contacts:contact_id(id,first_name,last_name,phone,company,status), projects:project_id(name)")
+      .select("id,followup_date,content,contacts:contact_id(id,first_name,last_name,phone,company,status),projects:project_id(name)")
       .eq("user_id", profile.id)
       .not("followup_date","is",null)
       .gte("followup_date", today)
-      .lte("followup_date", twoWeeksStr)
-      .order("followup_date", {ascending:true})
-      .then(({data}) => setUpcomingFollowups(data||[]));
+      .lte("followup_date", d14.toISOString().split("T")[0])
+      .order("followup_date",{ascending:true})
+      .then(({data})=>setItems(data||[]));
   }, [profile?.id]);
 
-  // Calcul semaines
-  const now2       = new Date();
-  const todayD     = new Date(now2.toDateString());
-  const todayStr2  = now2.toDateString();
-  const dow        = todayD.getDay() === 0 ? 6 : todayD.getDay()-1; // lundi=0
-  const monThis    = new Date(todayD); monThis.setDate(todayD.getDate()-dow);
-  const sunThis    = new Date(monThis); sunThis.setDate(monThis.getDate()+6);
-  const monNext    = new Date(sunThis); monNext.setDate(sunThis.getDate()+1);
-  const sunNext    = new Date(monNext); sunNext.setDate(monNext.getDate()+6);
-  const fmtD       = d => new Date(d).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"});
-  const fmtRange   = (a,b) => `${a.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} → ${b.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}`;
+  if (items.length === 0) return null;
 
-  const overdueF   = upcomingFollowups.filter(n => new Date(n.followup_date) < todayD);
-  const todayF     = upcomingFollowups.filter(n => new Date(n.followup_date).toDateString() === todayStr2);
-  const thisWeekF  = upcomingFollowups.filter(n => { const d=new Date(n.followup_date); return d>todayD && d>=monThis && d<=sunThis; });
-  const nextWeekF  = upcomingFollowups.filter(n => { const d=new Date(n.followup_date); return d>=monNext && d<=sunNext; });
+  const now      = new Date();
+  const todayD   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayStr = todayD.toDateString();
+  const dow      = todayD.getDay()===0 ? 6 : todayD.getDay()-1;
+  const mon0     = new Date(todayD); mon0.setDate(todayD.getDate()-dow);
+  const sun0     = new Date(mon0);   sun0.setDate(mon0.getDate()+6);
+  const mon1     = new Date(sun0);   mon1.setDate(sun0.getDate()+1);
+  const sun1     = new Date(mon1);   sun1.setDate(mon1.getDate()+6);
+  const fmt      = d => { try { return new Date(d).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}); } catch(e){return d;} };
+  const fmtR     = (a,b) => a.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})+" → "+b.toLocaleDateString("fr-FR",{day:"numeric",month:"short"});
+  const sd       = d => { try{return new Date(d);}catch(e){return new Date(0);} };
 
-  const FollowupRow = ({n, borderColor}) => (
-    <div key={n.id} style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"10px 0", borderBottom:`1px solid ${borderColor}`, cursor: n.contacts?.id ? "pointer":"default" }}
-      onClick={()=>{ if(n.contacts?.id) onSelect({...n.contacts, id:n.contacts.id}); }}>
-      {/* Avatar */}
-      <div style={{ width:36, height:36, borderRadius:"50%", background:"#1A1A1A", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", flexShrink:0 }}>
+  const overdueF  = items.filter(n=>sd(n.followup_date)<todayD);
+  const todayF    = items.filter(n=>sd(n.followup_date).toDateString()===todayStr);
+  const weekF     = items.filter(n=>{const d=sd(n.followup_date);return d>todayD&&d>=mon0&&d<=sun0;});
+  const nextF     = items.filter(n=>{const d=sd(n.followup_date);return d>=mon1&&d<=sun1;});
+
+  const Row = ({n,bc}) => (
+    <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"10px 0",borderBottom:`1px solid ${bc}`,cursor:n.contacts?.id?"pointer":"default"}}
+      onClick={()=>n.contacts?.id&&onSelect(n.contacts)}>
+      <div style={{width:36,height:36,borderRadius:"50%",background:"#1A1A1A",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,fontFamily:"'Helvetica Neue',sans-serif",flexShrink:0}}>
         {((n.contacts?.first_name||"?")[0]).toUpperCase()}
       </div>
-      {/* Infos */}
-      <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ fontSize:13, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:13,fontWeight:700,fontFamily:"'Helvetica Neue',sans-serif",color:"#1A1A1A"}}>
           {n.contacts?.first_name} {n.contacts?.last_name}
-          {n.contacts?.company && <span style={{ fontWeight:400, color:"#888", marginLeft:6 }}>· {n.contacts.company}</span>}
+          {n.contacts?.company&&<span style={{fontWeight:400,color:"#888",marginLeft:6}}>· {n.contacts.company}</span>}
         </div>
-        <div style={{ display:"flex", gap:10, marginTop:3, flexWrap:"wrap" }}>
-          {n.contacts?.phone && (
-            <a href={`tel:${n.contacts.phone}`} style={{ fontSize:11, color:"#1A6AFF", fontFamily:"'Helvetica Neue',sans-serif", textDecoration:"none", fontWeight:600 }}>
-              📞 {n.contacts.phone}
-            </a>
-          )}
-          {n.projects?.name && (
-            <span style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>📁 {n.projects.name}</span>
-          )}
-          {n.content && (
-            <span style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>💬 {n.content.slice(0,40)}{n.content.length>40?"…":""}</span>
-          )}
+        <div style={{display:"flex",gap:10,marginTop:3,flexWrap:"wrap"}}>
+          {n.contacts?.phone&&<a href={`tel:${n.contacts.phone}`} style={{fontSize:11,color:"#1A6AFF",fontFamily:"'Helvetica Neue',sans-serif",textDecoration:"none",fontWeight:600}}>📞 {n.contacts.phone}</a>}
+          {n.projects?.name&&<span style={{fontSize:11,color:"#FF4C1A",fontFamily:"'Helvetica Neue',sans-serif"}}>📁 {n.projects.name}</span>}
+          {n.content&&<span style={{fontSize:11,color:"#888",fontFamily:"'Helvetica Neue',sans-serif"}}>💬 {n.content.slice(0,40)}{n.content.length>40?"…":""}</span>}
         </div>
       </div>
-      {/* Date */}
-      <div style={{ fontSize:11, fontWeight:700, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", flexShrink:0, textAlign:"right" }}>
-        📅 {fmtD(n.followup_date)}
-      </div>
+      <div style={{fontSize:11,fontWeight:700,color:"#FF4C1A",fontFamily:"'Helvetica Neue',sans-serif",flexShrink:0,textAlign:"right"}}>📅 {fmt(n.followup_date)}</div>
+    </div>
+  );
+
+  const Section = ({list,title,bg,border,bc}) => list.length===0?null:(
+    <div style={{background:bg,border:`2px solid ${border}`,borderRadius:14,padding:14,marginBottom:10}}>
+      <div style={{fontSize:13,fontWeight:700,color:border,fontFamily:"'Helvetica Neue',sans-serif",marginBottom:8}}>{title}</div>
+      {list.map(n=><Row key={n.id} n={n} bc={bc}/>)}
     </div>
   );
 
   return (
+    <div style={{marginBottom:18}}>
+      <Section list={overdueF} title={`⚠️ ${overdueF.length} rappel${overdueF.length>1?"s":""} en retard`}          bg="#FFF0F0" border="#FF2D2D" bc="#FFD0D0"/>
+      <Section list={todayF}   title={`📅 ${todayF.length} rappel${todayF.length>1?"s":""} aujourd'hui`}             bg="#FFF8F0" border="#FF9500" bc="#FFE4B0"/>
+      <Section list={weekF}    title={`📆 Cette semaine — ${weekF.length} rappel${weekF.length>1?"s":""} · ${fmtR(mon0,sun0)}`}  bg="#F0F6FF" border="#1A6AFF" bc="#BFDBFE"/>
+      <Section list={nextF}    title={`🗓 Semaine suivante — ${nextF.length} rappel${nextF.length>1?"s":""} · ${fmtR(mon1,sun1)}`} bg="#F5F3FF" border="#8B5CF6" bc="#DDD6FE"/>
+    </div>
+  );
+}
+
+function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, lang="fr", subscription=null, globalSearch="", setGlobalSearch, onSelect }) {
+  return (
     <div style={P(isMobile)}>
-      <div style={{ marginBottom:22 }}>
+      <div style={{marginBottom:22}}>
         <h1 style={T(isMobile)}>{t("dashboard_title",lang)}</h1>
         <p style={Sub}>{new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</p>
       </div>
 
-      {!isManager(profile) && subscription && subscription.status !== "lifetime" && !(subscription.current_period_end && new Date(subscription.current_period_end) > new Date("2099-01-01")) && (() => {
-        const now = new Date();
-        const trialEnd = subscription.trial_ends_at ? new Date(subscription.trial_ends_at) : null;
-        const daysLeft = trialEnd ? Math.ceil((trialEnd - now) / 86400000) : 0;
-        if (subscription.status === "expired") return (
-          <div style={{ background:"#FF2D2D", borderRadius:12, padding:16, marginBottom:20, display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+      {!isManager(profile) && subscription && subscription.status !== "lifetime" && !(subscription.current_period_end && new Date(subscription.current_period_end) > new Date("2099-01-01")) && (()=>{
+        const now2=new Date();
+        const trialEnd=subscription.trial_ends_at?new Date(subscription.trial_ends_at):null;
+        const daysLeft=trialEnd?Math.ceil((trialEnd-now2)/86400000):0;
+        if(subscription.status==="expired") return(
+          <div style={{background:"#FF2D2D",borderRadius:12,padding:16,marginBottom:20,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
             <div>
-              <div style={{ fontSize:14, fontWeight:700, color:"#fff", fontFamily:"'Helvetica Neue',sans-serif" }}>⚠️ Abonnement expiré</div>
-              <div style={{ fontSize:12, color:"rgba(255,255,255,0.8)", fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>Abonnez-vous pour continuer à utiliser Prospeo</div>
+              <div style={{fontSize:14,fontWeight:700,color:"#fff",fontFamily:"'Helvetica Neue',sans-serif"}}>⚠️ Abonnement expiré</div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,0.8)",fontFamily:"'Helvetica Neue',sans-serif",marginTop:2}}>Abonnez-vous pour continuer à utiliser Prospeo</div>
             </div>
-            <button style={{ padding:"8px 16px", background:"#fff", color:"#FF2D2D", border:"none", borderRadius:8, cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", flexShrink:0 }} onClick={()=>go("subscription")}>{t("subscribe",lang)}</button>
+            <button style={{padding:"8px 16px",background:"#fff",color:"#FF2D2D",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:"'Helvetica Neue',sans-serif",flexShrink:0}} onClick={()=>go("subscription")}>{t("subscribe",lang)}</button>
           </div>
         );
-        if (subscription.status === "trial" && daysLeft <= 3) return (
-          <div style={{ background:"#FF9500", borderRadius:12, padding:16, marginBottom:20, display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+        if(subscription.status==="trial"&&daysLeft<=3) return(
+          <div style={{background:"#FF9500",borderRadius:12,padding:16,marginBottom:20,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
             <div>
-              <div style={{ fontSize:14, fontWeight:700, color:"#fff", fontFamily:"'Helvetica Neue',sans-serif" }}>⏳ Essai : {daysLeft} jour{daysLeft > 1?"s":""} restant{daysLeft > 1?"s":""}</div>
-              <div style={{ fontSize:12, color:"rgba(255,255,255,0.8)", fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>Activez votre abonnement pour ne pas perdre vos données</div>
+              <div style={{fontSize:14,fontWeight:700,color:"#fff",fontFamily:"'Helvetica Neue',sans-serif"}}>⏳ Essai : {daysLeft} jour{daysLeft>1?"s":""} restant{daysLeft>1?"s":""}</div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,0.8)",fontFamily:"'Helvetica Neue',sans-serif",marginTop:2}}>Activez votre abonnement pour ne pas perdre vos données</div>
             </div>
-            <button style={{ padding:"8px 16px", background:"#fff", color:"#FF9500", border:"none", borderRadius:8, cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", flexShrink:0 }} onClick={()=>go("subscription")}>{t("see_plans",lang)}</button>
+            <button style={{padding:"8px 16px",background:"#fff",color:"#FF9500",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:"'Helvetica Neue',sans-serif",flexShrink:0}} onClick={()=>go("subscription")}>{t("see_plans",lang)}</button>
           </div>
         );
-        if (subscription.status === "trial") return (
-          <div style={{ background:"#E8F4FF", borderRadius:12, padding:14, marginBottom:16, display:"flex", alignItems:"center", gap:10 }}>
-            <span style={{ fontSize:16 }}>🎁</span>
-            <div style={{ fontFamily:"'Helvetica Neue',sans-serif", fontSize:13, color:"#1A6AFF" }}>{t("trial_active",lang)} — {daysLeft} jour{daysLeft>1?"s":""} restant{daysLeft>1?"s":""}</div>
+        if(subscription.status==="trial") return(
+          <div style={{background:"#E8F4FF",borderRadius:12,padding:14,marginBottom:16,display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:16}}>🎁</span>
+            <div style={{fontFamily:"'Helvetica Neue',sans-serif",fontSize:13,color:"#1A6AFF"}}>{t("trial_active",lang)} — {daysLeft} jour{daysLeft>1?"s":""} restant{daysLeft>1?"s":""}</div>
           </div>
         );
         return null;
@@ -556,54 +606,9 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
         ))}
       </div>
 
-      {/* ── RAPPELS À VENIR : S et S+1 ── */}
-      {(overdueF.length > 0 || todayF.length > 0 || thisWeekF.length > 0 || nextWeekF.length > 0) && (
-        <div style={{ marginBottom:18 }}>
 
-          {overdueF.length > 0 && (
-            <div style={{ background:"#FFF0F0", border:"2px solid #FF2D2D", borderRadius:14, padding:14, marginBottom:10 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:"#FF2D2D", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:8 }}>
-                ⚠️ {overdueF.length} rappel{overdueF.length>1?"s":""} en retard
-              </div>
-              {overdueF.map(n => <FollowupRow key={n.id} n={n} borderColor="#FFD0D0" />)}
-            </div>
-          )}
-
-          {todayF.length > 0 && (
-            <div style={{ background:"#FFF8F0", border:"2px solid #FF9500", borderRadius:14, padding:14, marginBottom:10 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:"#FF9500", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:8 }}>
-                📅 {todayF.length} rappel{todayF.length>1?"s":""} aujourd'hui
-              </div>
-              {todayF.map(n => <FollowupRow key={n.id} n={n} borderColor="#FFE4B0" />)}
-            </div>
-          )}
-
-          {thisWeekF.length > 0 && (
-            <div style={{ background:"#F0F6FF", border:"2px solid #1A6AFF", borderRadius:14, padding:14, marginBottom:10 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:"#1A6AFF", fontFamily:"'Helvetica Neue',sans-serif" }}>
-                  📆 Cette semaine — {thisWeekF.length} rappel{thisWeekF.length>1?"s":""}
-                </div>
-                <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{fmtRange(monThis,sunThis)}</div>
-              </div>
-              {thisWeekF.map(n => <FollowupRow key={n.id} n={n} borderColor="#BFDBFE" />)}
-            </div>
-          )}
-
-          {nextWeekF.length > 0 && (
-            <div style={{ background:"#F5F3FF", border:"2px solid #8B5CF6", borderRadius:14, padding:14, marginBottom:10 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:"#8B5CF6", fontFamily:"'Helvetica Neue',sans-serif" }}>
-                  🗓 Semaine suivante — {nextWeekF.length} rappel{nextWeekF.length>1?"s":""}
-                </div>
-                <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{fmtRange(monNext,sunNext)}</div>
-              </div>
-              {nextWeekF.map(n => <FollowupRow key={n.id} n={n} borderColor="#DDD6FE" />)}
-            </div>
-          )}
-
-        </div>
-      )}
+      {/* ── RAPPELS S ET S+1 ── */}
+      <FollowupsPanel profile={profile} onSelect={onSelect} />
 
       {/* ── BARRE DE RECHERCHE GLOBALE ── */}
       {(() => {
@@ -1921,7 +1926,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
   );
 }
 
-function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, onUpdated }) {
+function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, theme, applyTheme, onUpdated }) {
   const [form, setForm] = useState({
     first_name: "",
     last_name:  "",
@@ -2101,6 +2106,36 @@ function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, onUpdat
             ))}
           </div>
         </div>
+
+        {/* ── Thème de l'application ── */}
+        {applyTheme && (
+          <div style={{ marginBottom:20 }}>
+            <label style={L}>🎨 Thème de l'application</label>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginTop:8 }}>
+              {THEMES.map(th => {
+                const isActive = (theme?.id || "sand") === th.id;
+                return (
+                  <button key={th.id}
+                    onClick={() => applyTheme(th.id)}
+                    style={{ border:`2px solid ${isActive?"#"+th.accent:"#E8E0D4"}`, borderRadius:12, padding:10, background:isActive?"#"+th.bg:"#fff", cursor:"pointer", transition:"all 0.2s", outline:"none" }}>
+                    {/* Prévisualisation mini */}
+                    <div style={{ display:"flex", gap:3, marginBottom:7, justifyContent:"center" }}>
+                      {th.preview.map((c,i) => (
+                        <div key={i} style={{ width:18, height:18, borderRadius:"50%", background:"#"+c, border:"1px solid #E8E0D4" }} />
+                      ))}
+                    </div>
+                    <div style={{ fontSize:11, fontWeight:isActive?700:400, color:isActive?"#"+th.accent:"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>
+                      {th.name}
+                    </div>
+                    {isActive && (
+                      <div style={{ fontSize:9, color:"#"+th.accent, fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>✓ Actif</div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <button style={{ ...BP, width:"100%", marginTop:16, padding:"14px" }} onClick={save} disabled={saving}>
           {saving ? t("saving",lang) : t("save_profile",lang)}
