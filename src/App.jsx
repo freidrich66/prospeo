@@ -441,6 +441,76 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
 }
 
 function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, lang="fr", subscription=null, globalSearch="", setGlobalSearch, onSelect }) {
+  const [upcomingFollowups, setUpcomingFollowups] = React.useState([]);
+
+  React.useEffect(() => {
+    if (!profile?.id) return;
+    // Charger les relances S et S+1 (aujourd'hui + 14 jours)
+    const today = new Date().toISOString().split("T")[0];
+    const twoWeeks = new Date(); twoWeeks.setDate(twoWeeks.getDate()+14);
+    const twoWeeksStr = twoWeeks.toISOString().split("T")[0];
+    supabase.from("contact_notes")
+      .select("id,followup_date,content,contact_type,contacts:contact_id(id,first_name,last_name,phone,company,status), projects:project_id(name)")
+      .eq("user_id", profile.id)
+      .not("followup_date","is",null)
+      .gte("followup_date", today)
+      .lte("followup_date", twoWeeksStr)
+      .order("followup_date", {ascending:true})
+      .then(({data}) => setUpcomingFollowups(data||[]));
+  }, [profile?.id]);
+
+  // Calcul semaines
+  const now2       = new Date();
+  const todayD     = new Date(now2.toDateString());
+  const todayStr2  = now2.toDateString();
+  const dow        = todayD.getDay() === 0 ? 6 : todayD.getDay()-1; // lundi=0
+  const monThis    = new Date(todayD); monThis.setDate(todayD.getDate()-dow);
+  const sunThis    = new Date(monThis); sunThis.setDate(monThis.getDate()+6);
+  const monNext    = new Date(sunThis); monNext.setDate(sunThis.getDate()+1);
+  const sunNext    = new Date(monNext); sunNext.setDate(monNext.getDate()+6);
+  const fmtD       = d => new Date(d).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"});
+  const fmtRange   = (a,b) => `${a.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} → ${b.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}`;
+
+  const overdueF   = upcomingFollowups.filter(n => new Date(n.followup_date) < todayD);
+  const todayF     = upcomingFollowups.filter(n => new Date(n.followup_date).toDateString() === todayStr2);
+  const thisWeekF  = upcomingFollowups.filter(n => { const d=new Date(n.followup_date); return d>todayD && d>=monThis && d<=sunThis; });
+  const nextWeekF  = upcomingFollowups.filter(n => { const d=new Date(n.followup_date); return d>=monNext && d<=sunNext; });
+
+  const FollowupRow = ({n, borderColor}) => (
+    <div key={n.id} style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"10px 0", borderBottom:`1px solid ${borderColor}` }}
+      onClick={()=>{ if(n.contacts?.id) onSelect({...n.contacts, id:n.contacts.id}); }}
+      style2={{ cursor: n.contacts?.id ? "pointer":"default" }}>
+      {/* Avatar */}
+      <div style={{ width:36, height:36, borderRadius:"50%", background:"#1A1A1A", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", flexShrink:0 }}>
+        {((n.contacts?.first_name||"?")[0]).toUpperCase()}
+      </div>
+      {/* Infos */}
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontSize:13, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>
+          {n.contacts?.first_name} {n.contacts?.last_name}
+          {n.contacts?.company && <span style={{ fontWeight:400, color:"#888", marginLeft:6 }}>· {n.contacts.company}</span>}
+        </div>
+        <div style={{ display:"flex", gap:10, marginTop:3, flexWrap:"wrap" }}>
+          {n.contacts?.phone && (
+            <a href={`tel:${n.contacts.phone}`} style={{ fontSize:11, color:"#1A6AFF", fontFamily:"'Helvetica Neue',sans-serif", textDecoration:"none", fontWeight:600 }}>
+              📞 {n.contacts.phone}
+            </a>
+          )}
+          {n.projects?.name && (
+            <span style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>📁 {n.projects.name}</span>
+          )}
+          {n.content && (
+            <span style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>💬 {n.content.slice(0,40)}{n.content.length>40?"…":""}</span>
+          )}
+        </div>
+      </div>
+      {/* Date */}
+      <div style={{ fontSize:11, fontWeight:700, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", flexShrink:0, textAlign:"right" }}>
+        📅 {fmtD(n.followup_date)}
+      </div>
+    </div>
+  );
+
   return (
     <div style={P(isMobile)}>
       <div style={{ marginBottom:22 }}>
@@ -486,6 +556,56 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
           </div>
         ))}
       </div>
+
+      {/* ── RAPPELS À VENIR : S et S+1 ── */}
+      {(overdueF.length > 0 || todayF.length > 0 || thisWeekF.length > 0 || nextWeekF.length > 0) && (
+        <div style={{ marginBottom:18 }}>
+
+          {overdueF.length > 0 && (
+            <div style={{ background:"#FFF0F0", border:"2px solid #FF2D2D", borderRadius:14, padding:14, marginBottom:10 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:"#FF2D2D", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:8 }}>
+                ⚠️ {overdueF.length} rappel{overdueF.length>1?"s":""} en retard
+              </div>
+              {overdueF.map(n => <FollowupRow key={n.id} n={n} borderColor="#FFD0D0" />)}
+            </div>
+          )}
+
+          {todayF.length > 0 && (
+            <div style={{ background:"#FFF8F0", border:"2px solid #FF9500", borderRadius:14, padding:14, marginBottom:10 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:"#FF9500", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:8 }}>
+                📅 {todayF.length} rappel{todayF.length>1?"s":""} aujourd'hui
+              </div>
+              {todayF.map(n => <FollowupRow key={n.id} n={n} borderColor="#FFE4B0" />)}
+            </div>
+          )}
+
+          {thisWeekF.length > 0 && (
+            <div style={{ background:"#F0F6FF", border:"2px solid #1A6AFF", borderRadius:14, padding:14, marginBottom:10 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:"#1A6AFF", fontFamily:"'Helvetica Neue',sans-serif" }}>
+                  📆 Cette semaine — {thisWeekF.length} rappel{thisWeekF.length>1?"s":""}
+                </div>
+                <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{fmtRange(monThis,sunThis)}</div>
+              </div>
+              {thisWeekF.map(n => <FollowupRow key={n.id} n={n} borderColor="#BFDBFE" />)}
+            </div>
+          )}
+
+          {nextWeekF.length > 0 && (
+            <div style={{ background:"#F5F3FF", border:"2px solid #8B5CF6", borderRadius:14, padding:14, marginBottom:10 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:"#8B5CF6", fontFamily:"'Helvetica Neue',sans-serif" }}>
+                  🗓 Semaine suivante — {nextWeekF.length} rappel{nextWeekF.length>1?"s":""}
+                </div>
+                <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>{fmtRange(monNext,sunNext)}</div>
+              </div>
+              {nextWeekF.map(n => <FollowupRow key={n.id} n={n} borderColor="#DDD6FE" />)}
+            </div>
+          )}
+
+        </div>
+      )}
+
       {/* ── BARRE DE RECHERCHE GLOBALE ── */}
       {(() => {
         const q = globalSearch.trim().toLowerCase();
