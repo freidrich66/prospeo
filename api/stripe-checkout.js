@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 
-const APP_URL = process.env.APP_URL || "https://prospeo-red.vercel.app";
+const APP_URL = process.env.APP_URL || "https://prospeo.me";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
