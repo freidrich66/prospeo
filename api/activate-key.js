@@ -95,7 +95,7 @@ export default async function handler(req, res) {
       current_period_end: keyData.expires_at,
       stripe_customer_id: null,
       stripe_sub_id:      null,
-      trial_ends_at:      plan === "trial" ? keyData.expires_at : null,
+      trial_ends_at:      plan === "trial" ? keyData.expires_at : "2099-12-31T23:59:59Z",
     };
 
     const { error: subErr } = await supabase
