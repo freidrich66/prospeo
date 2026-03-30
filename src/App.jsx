@@ -1,42 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback, createContext, useContext } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "./supabase.js";
 import { LANGUAGES, t, detectBrowserLang, getSavedLang, saveLang } from "./i18n.js";
-
-// ── Thèmes ───────────────────────────────────────────────────
-const THEMES = [
-  { id:"parchment", name:{fr:"Parchemin",en:"Parchment",es:"Pergamino",pt:"Pergaminho",it:"Pergamena",de:"Pergament",no:"Pergament",sv:"Pergament",nl:"Perkament",zh:"羊皮纸"},
-    bg:"F5F0E8", sidebar:"292524", accent:"FF4C1A", card:"FDFCFB", cardBorder:"E8E2D9", text:"1C1917", subtext:"78716C", inputBorder:"D6CFC6", preview:["F5F0E8","FF4C1A","292524"] },
-
-  { id:"ivory", name:{fr:"Ivoire",en:"Ivory",es:"Marfil",pt:"Marfim",it:"Avorio",de:"Elfenbein",no:"Elfenben",sv:"Elfenben",nl:"Ivoor",zh:"象牙白"},
-    bg:"FAF9F6", sidebar:"1C1917", accent:"E8611A", card:"FFFFFF", cardBorder:"E8E5DF", text:"1C1917", subtext:"79716C", inputBorder:"DDD8D0", preview:["FAF9F6","E8611A","1C1917"] },
-
-  { id:"linen", name:{fr:"Lin",en:"Linen",es:"Lino",pt:"Linho",it:"Lino",de:"Leinen",no:"Lin",sv:"Lin",nl:"Linnen",zh:"亚麻"},
-    bg:"F8F4EE", sidebar:"44403C", accent:"0F766E", card:"FFFEFB", cardBorder:"E5DDD2", text:"292524", subtext:"78716C", inputBorder:"D6CEC4", preview:["F8F4EE","0F766E","44403C"] },
-
-  { id:"chalk", name:{fr:"Craie",en:"Chalk",es:"Tiza",pt:"Giz",it:"Gesso",de:"Kreide",no:"Kritt",sv:"Krita",nl:"Krijt",zh:"粉笔白"},
-    bg:"FAFAF9", sidebar:"18181B", accent:"7C3AED", card:"FFFFFF", cardBorder:"E4E4E7", text:"18181B", subtext:"71717A", inputBorder:"D4D4D8", preview:["FAFAF9","7C3AED","18181B"] },
-
-  { id:"notion", name:{fr:"Notion",en:"Notion",es:"Notion",pt:"Notion",it:"Notion",de:"Notion",no:"Notion",sv:"Notion",nl:"Notion",zh:"Notion"},
-    bg:"FFFFFF", sidebar:"37352F", accent:"2F9E44", card:"FFFFFF", cardBorder:"E8E8E7", text:"37352F", subtext:"9B9A97", inputBorder:"E0DEDD", preview:["FFFFFF","2F9E44","37352F"] },
-
-  { id:"linear", name:{fr:"Linear",en:"Linear",es:"Linear",pt:"Linear",it:"Linear",de:"Linear",no:"Linear",sv:"Linear",nl:"Linear",zh:"Linear"},
-    bg:"F8FAFC", sidebar:"0F172A", accent:"6366F1", card:"FFFFFF", cardBorder:"E2E8F0", text:"0F172A", subtext:"64748B", inputBorder:"CBD5E1", preview:["F8FAFC","6366F1","0F172A"] },
-
-  { id:"figma", name:{fr:"Figma",en:"Figma",es:"Figma",pt:"Figma",it:"Figma",de:"Figma",no:"Figma",sv:"Figma",nl:"Figma",zh:"Figma"},
-    bg:"F5F5F5", sidebar:"2C2C2C", accent:"F24E1E", card:"FFFFFF", cardBorder:"E0E0E0", text:"2C2C2C", subtext:"737373", inputBorder:"D4D4D4", preview:["F5F5F5","F24E1E","2C2C2C"] },
-
-  { id:"dusk", name:{fr:"Crépuscule",en:"Dusk",es:"Crepúsculo",pt:"Crepúsculo",it:"Crepuscolo",de:"Dämmerung",no:"Skumring",sv:"Skymning",nl:"Schemering",zh:"黄昏"},
-    bg:"1C1917", sidebar:"0C0A09", accent:"F97316", card:"292524", cardBorder:"3C3532", text:"E7E5E4", subtext:"A8A29E", inputBorder:"44403C", preview:["1C1917","F97316","0C0A09"] },
-
-  { id:"midnight", name:{fr:"Minuit",en:"Midnight",es:"Medianoche",pt:"Meia-noite",it:"Mezzanotte",de:"Mitternacht",no:"Midnatt",sv:"Midnatt",nl:"Middernacht",zh:"午夜"},
-    bg:"0F172A", sidebar:"020617", accent:"38BDF8", card:"1E293B", cardBorder:"293548", text:"E2E8F0", subtext:"94A3B8", inputBorder:"334155", preview:["0F172A","38BDF8","020617"] },
-];
-const DEFAULT_THEME = THEMES[0];
-function getTheme(id) { return THEMES.find(th=>th.id===id) || DEFAULT_THEME; }
-const ThemeContext = createContext({ theme: DEFAULT_THEME, applyTheme: ()=>{} });
-const useTheme = () => useContext(ThemeContext);
-function loadSavedTheme() { try { return localStorage.getItem("prospeo_theme") || "parchment"; } catch(e) { return "sand"; } }
-function saveThemeLocal(id) { try { localStorage.setItem("prospeo_theme", id); } catch(e) {} }
 
 const STATUS_COLORS_BASE = {
   froid:    { bg: "#E8E0D4", text: "#888", key: "status_froid"    },
@@ -219,11 +183,6 @@ const globalCSS = `
   input, textarea { -webkit-appearance: none; appearance: none; }
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
-  :root {
-    --c-bg: #F5F0E8; --c-accent: #FF4C1A; --c-sidebar: #1A1A1A;
-    --c-card: #FFFFFF; --c-border: #F0EBE3; --c-text: #1A1A1A;
-    --c-subtext: #888888; --c-input-border: #E8E0D4;
-  }
 `;
 
 export default function App() {
@@ -316,35 +275,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
   const [loadingData, setLoadingData]   = useState(true);
   const [subscription, setSubscription] = useState(null);
   const [globalSearch, setGlobalSearch] = useState("");
-  const [themeId, setThemeId]           = useState(() => loadSavedTheme());
-  const theme = getTheme(themeId);
   const isMobile = useIsMobile();
-
-  // Injecte les variables CSS du thème
-  useEffect(() => {
-    const r = document.documentElement;
-    r.style.setProperty("--c-bg",           "#"+theme.bg);
-    r.style.setProperty("--c-accent",       "#"+theme.accent);
-    r.style.setProperty("--c-sidebar",      "#"+theme.sidebar);
-    r.style.setProperty("--c-card",         "#"+theme.card);
-    r.style.setProperty("--c-border",       "#"+theme.cardBorder);
-    r.style.setProperty("--c-text",         "#"+theme.text);
-    r.style.setProperty("--c-subtext",      "#"+theme.subtext);
-    r.style.setProperty("--c-input-border", "#"+theme.inputBorder);
-    document.body.style.background = "#"+theme.bg;
-  }, [themeId]);
-
-  // Charge le thème Supabase au démarrage
-  useEffect(() => {
-    if (profile?.theme && profile.theme !== themeId) {
-      setThemeId(profile.theme); saveThemeLocal(profile.theme);
-    }
-  }, [profile?.theme]);
-
-  const applyTheme = (id) => {
-    setThemeId(id); saveThemeLocal(id);
-    if (profile?.id) supabase.from("profiles").update({theme:id}).eq("id",profile.id);
-  };
 
   const notify = (msg, type="success") => { setNotif({msg,type}); setTimeout(()=>setNotif(null),3000); };
 
@@ -418,8 +349,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, applyTheme }}>
-    <div style={{ display:"flex", minHeight:"100vh", background:"var(--c-bg)", fontFamily:"Georgia,serif" }}>
+    <div style={{ display:"flex", minHeight:"100vh", background:"#F5F0E8", fontFamily:"Georgia,serif" }}>
 
       {notif && (
         <div style={{ position:"fixed", top:isMobile?64:24, left:"50%", transform:"translateX(-50%)", zIndex:2000, padding:"11px 22px", borderRadius:30, color:"#fff", background:notif.type==="error"?"#FF2D2D":"#00C48C", fontFamily:"'Helvetica Neue',sans-serif", fontSize:13, fontWeight:600, boxShadow:"0 4px 20px rgba(0,0,0,0.2)", whiteSpace:"nowrap", animation:"slideUp 0.2s ease" }}>
@@ -429,7 +359,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
 
       {/* Desktop sidebar */}
       {!isMobile && (
-        <aside style={{ width:240, minHeight:"100vh", background:"var(--c-sidebar)", display:"flex", flexDirection:"column", padding:"28px 0", flexShrink:0, position:"sticky", top:0, height:"100vh" }}>
+        <aside style={{ width:240, minHeight:"100vh", background:"#1A1A1A", display:"flex", flexDirection:"column", padding:"28px 0", flexShrink:0, position:"sticky", top:0, height:"100vh" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, padding:"0 24px 22px", borderBottom:"1px solid #2A2A2A", marginBottom:14 }}>
             <span style={{ fontSize:22, color:"#FF4C1A" }}>◈</span>
             <span style={{ fontSize:17, fontWeight:700, letterSpacing:4, color:"#E8E0D4", fontFamily:"'Helvetica Neue',sans-serif" }}>PROSPEO</span>
@@ -464,7 +394,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
 
       {/* Mobile top bar */}
       {isMobile && (
-        <div style={{ position:"fixed", top:0, left:0, right:0, zIndex:100, background:"var(--c-sidebar)", padding:"0 16px", height:54, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <div style={{ position:"fixed", top:0, left:0, right:0, zIndex:100, background:"#1A1A1A", padding:"0 16px", height:54, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <span style={{ fontSize:17, color:"#FF4C1A" }}>◈</span>
             <span style={{ fontSize:15, fontWeight:700, letterSpacing:3, color:"#E8E0D4", fontFamily:"'Helvetica Neue',sans-serif" }}>PROSPEO</span>
@@ -483,7 +413,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
         {view==="list"      && <ListView contacts={contacts} profile={profile} loadingData={loadingData} isMobile={isMobile} lang={lang} onSelect={c=>{setSelected(c);setView("detail");}} onAdd={()=>go("add")} />}
         {view==="detail" && selected && <DetailView contact={selected} profile={profile} isMobile={isMobile} lang={lang} onBack={()=>setView("list")} onStatusUpdate={handleStatusUpdate} onDelete={handleDelete} notify={notify} />}
         {view==="report"    && <ReportView contacts={contacts} profile={profile} isMobile={isMobile} lang={lang} globalSearch={globalSearch} setGlobalSearch={setGlobalSearch} notify={notify} onSelectContact={c=>{setSelected(c);setView("detail");}} />}
-        {view==="profile"       && <ProfileView profile={profile} isMobile={isMobile} notify={notify} lang={lang} changeLang={changeLang} theme={theme} applyTheme={applyTheme} onUpdated={(p)=>{ setProfile(p); }} />}
+        {view==="profile"       && <ProfileView profile={profile} isMobile={isMobile} notify={notify} lang={lang} changeLang={changeLang} onUpdated={(p)=>{ setProfile(p); }} />}
         {view==="subscription"  && <SubscriptionView profile={profile} subscription={subscription} isMobile={isMobile} lang={lang} notify={notify} onActivated={loadSubscription} />}
         {view==="activate"      && <ActivateKeyView profile={profile} isMobile={isMobile} lang={lang} notify={notify} onActivated={()=>{ loadSubscription(); setView("dashboard"); }} />}
         {view==="superadmin" && isSuperManager(profile) && <SuperAdminView profile={profile} isMobile={isMobile} lang={lang} notify={notify} />}
@@ -497,7 +427,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
 
       {/* Mobile bottom nav */}
       {isMobile && (
-        <nav style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:100, background:"var(--c-sidebar)", display:"flex", borderTop:"1px solid #222", paddingBottom:"env(safe-area-inset-bottom,0px)" }}>
+        <nav style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:100, background:"#1A1A1A", display:"flex", borderTop:"1px solid #222", paddingBottom:"env(safe-area-inset-bottom,0px)" }}>
           {NAV.map(item => (
             <button key={item.id} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:3, padding:"9px 4px 7px", border:"none", background:"transparent", cursor:"pointer", color:view===item.id?"#FF4C1A":"#555" }} onClick={()=>go(item.id)}>
               <span style={{ fontSize:20 }}>{item.icon}</span>
@@ -506,80 +436,6 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
           ))}
         </nav>
       )}
-    </div>
-    </ThemeContext.Provider>
-  );
-}
-
-function FollowupsPanel({ profile, onSelect }) {
-  const [items, setItems] = useState([]);
-  useEffect(() => {
-    if (!profile?.id) return;
-    const today = new Date().toISOString().split("T")[0];
-    const d14 = new Date(); d14.setDate(d14.getDate()+14);
-    supabase.from("contact_notes")
-      .select("id,followup_date,content,contacts:contact_id(id,first_name,last_name,phone,company,status),projects:project_id(name)")
-      .eq("user_id", profile.id)
-      .not("followup_date","is",null)
-      .gte("followup_date", today)
-      .lte("followup_date", d14.toISOString().split("T")[0])
-      .order("followup_date",{ascending:true})
-      .then(({data})=>setItems(data||[]));
-  }, [profile?.id]);
-
-  if (items.length === 0) return null;
-
-  const now    = new Date();
-  const todayD = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const todayS = todayD.toDateString();
-  const dow    = todayD.getDay()===0?6:todayD.getDay()-1;
-  const mon0   = new Date(todayD); mon0.setDate(todayD.getDate()-dow);
-  const sun0   = new Date(mon0);   sun0.setDate(mon0.getDate()+6);
-  const mon1   = new Date(sun0);   mon1.setDate(sun0.getDate()+1);
-  const sun1   = new Date(mon1);   sun1.setDate(mon1.getDate()+6);
-  const fmt    = d => { try{return new Date(d).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"});}catch(e){return d;} };
-  const fmtR   = (a,b) => a.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})+" → "+b.toLocaleDateString("fr-FR",{day:"numeric",month:"short"});
-  const sd     = d => { try{return new Date(d);}catch(e){return new Date(0);} };
-
-  const overdueF = items.filter(n=>sd(n.followup_date)<todayD);
-  const todayF   = items.filter(n=>sd(n.followup_date).toDateString()===todayS);
-  const weekF    = items.filter(n=>{const d=sd(n.followup_date);return d>todayD&&d>=mon0&&d<=sun0;});
-  const nextF    = items.filter(n=>{const d=sd(n.followup_date);return d>=mon1&&d<=sun1;});
-
-  const Row = ({n,bc}) => (
-    <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"10px 0",borderBottom:`1px solid ${bc}`,cursor:n.contacts?.id?"pointer":"default"}}
-      onClick={()=>n.contacts?.id&&onSelect(n.contacts)}>
-      <div style={{width:36,height:36,borderRadius:"50%",background:"#1A1A1A",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,fontFamily:"'Helvetica Neue',sans-serif",flexShrink:0}}>
-        {((n.contacts?.first_name||"?")[0]).toUpperCase()}
-      </div>
-      <div style={{flex:1,minWidth:0}}>
-        <div style={{fontSize:13,fontWeight:700,fontFamily:"'Helvetica Neue',sans-serif",color:"#1A1A1A"}}>
-          {n.contacts?.first_name} {n.contacts?.last_name}
-          {n.contacts?.company&&<span style={{fontWeight:400,color:"#888",marginLeft:6}}>· {n.contacts.company}</span>}
-        </div>
-        <div style={{display:"flex",gap:10,marginTop:3,flexWrap:"wrap"}}>
-          {n.contacts?.phone&&<a href={`tel:${n.contacts.phone}`} style={{fontSize:11,color:"#1A6AFF",fontFamily:"'Helvetica Neue',sans-serif",textDecoration:"none",fontWeight:600}}>📞 {n.contacts.phone}</a>}
-          {n.projects?.name&&<span style={{fontSize:11,color:"#FF4C1A",fontFamily:"'Helvetica Neue',sans-serif"}}>📁 {n.projects.name}</span>}
-          {n.content&&<span style={{fontSize:11,color:"#888",fontFamily:"'Helvetica Neue',sans-serif"}}>💬 {n.content.slice(0,40)}{n.content.length>40?"…":""}</span>}
-        </div>
-      </div>
-      <div style={{fontSize:11,fontWeight:700,color:"#FF4C1A",fontFamily:"'Helvetica Neue',sans-serif",flexShrink:0}}>📅 {fmt(n.followup_date)}</div>
-    </div>
-  );
-
-  const Section = ({list,title,bg,border,bc}) => list.length===0?null:(
-    <div style={{background:bg,border:`2px solid ${border}`,borderRadius:14,padding:14,marginBottom:10}}>
-      <div style={{fontSize:13,fontWeight:700,color:border,fontFamily:"'Helvetica Neue',sans-serif",marginBottom:8}}>{title}</div>
-      {list.map(n=><Row key={n.id} n={n} bc={bc}/>)}
-    </div>
-  );
-
-  return (
-    <div style={{marginBottom:18}}>
-      <Section list={overdueF} title={`⚠️ ${overdueF.length} rappel${overdueF.length>1?"s":""} en retard`}            bg="#FFF0F0" border="#FF2D2D" bc="#FFD0D0"/>
-      <Section list={todayF}   title={`📅 ${todayF.length} rappel${todayF.length>1?"s":""} aujourd'hui`}               bg="#FFF8F0" border="#FF9500" bc="#FFE4B0"/>
-      <Section list={weekF}    title={`📆 Cette semaine — ${weekF.length} rappel${weekF.length>1?"s":""} · ${fmtR(mon0,sun0)}`}   bg="#F0F6FF" border="#1A6AFF" bc="#BFDBFE"/>
-      <Section list={nextF}    title={`🗓 Semaine suivante — ${nextF.length} rappel${nextF.length>1?"s":""} · ${fmtR(mon1,sun1)}`} bg="#F5F3FF" border="#8B5CF6" bc="#DDD6FE"/>
     </div>
   );
 }
@@ -630,10 +486,6 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
           </div>
         ))}
       </div>
-
-      {/* ── RAPPELS S ET S+1 ── */}
-      <FollowupsPanel profile={profile} onSelect={onSelect} />
-
       {/* ── BARRE DE RECHERCHE GLOBALE ── */}
       {(() => {
         const q = globalSearch.trim().toLowerCase();
@@ -1950,7 +1802,7 @@ function ReportView({ contacts, profile, isMobile, lang="fr", globalSearch="", s
   );
 }
 
-function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, theme, applyTheme, onUpdated }) {
+function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, onUpdated }) {
   const [form, setForm] = useState({
     first_name: "",
     last_name:  "",
@@ -2131,31 +1983,6 @@ function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, theme, 
           </div>
         </div>
 
-        {/* ── Sélecteur de thème ── */}
-        <div style={{ marginTop:20, padding:"16px 0", borderTop:"1px solid #F0EBE0" }}>
-          <label style={L}>🎨 Thème de l'application</label>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginTop:10 }}>
-            {THEMES.map(th => {
-              const isActive = (theme?.id || "parchment") === th.id;
-              return (
-                <button key={th.id}
-                  onClick={()=>applyTheme && applyTheme(th.id)}
-                  style={{ border:`2px solid ${isActive?"#"+th.accent:"#D0D0D0"}`, borderRadius:12, padding:"10px 8px", background:"#"+th.bg, cursor:"pointer", outline:"none", transition:"all 0.15s", boxShadow:isActive?"0 0 0 3px #"+th.accent+"40":"none" }}>
-                  <div style={{ display:"flex", gap:4, marginBottom:7, justifyContent:"center" }}>
-                    {th.preview.map((col,i)=>(
-                      <div key={i} style={{ width:18, height:18, borderRadius:"50%", background:"#"+col, border:"1px solid rgba(0,0,0,0.1)" }} />
-                    ))}
-                  </div>
-                  <div style={{ fontSize:12, fontWeight:isActive?700:400, color:"#"+th.text, fontFamily:"'Helvetica Neue',sans-serif" }}>
-                    {th.name[lang] || th.name.fr}
-                  </div>
-                  {isActive && <div style={{ fontSize:10, color:"#"+th.accent, fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>✓ Actif</div>}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
         <button style={{ ...BP, width:"100%", marginTop:16, padding:"14px" }} onClick={save} disabled={saving}>
           {saving ? t("saving",lang) : t("save_profile",lang)}
         </button>
@@ -2169,19 +1996,14 @@ function SubscriptionView({ profile, subscription, isMobile, lang="fr", notify, 
   const [addingMore, setAddingMore]  = useState(false);
   const [loading, setLoading] = useState(false);
   const [showActivate, setShowActivate] = useState(false);
-  const [subCompany, setSubCompany]     = useState(profile?.company || "");
 
   const subscribe = async (plan) => {
-    if (!subCompany.trim()) {
-      notify("Veuillez saisir le nom de votre entreprise", "error");
-      return;
-    }
     setLoading(true);
     try {
       const res = await fetch("/api/stripe-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan, email: profile.email, userId: profile.id, companyName: subCompany.trim() }),
+        body: JSON.stringify({ plan, email: profile.email, userId: profile.id }),
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
@@ -2238,20 +2060,7 @@ function SubscriptionView({ profile, subscription, isMobile, lang="fr", notify, 
                 <div key={f} style={{ fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#aaa" }}>{f}</div>
               ))}
             </div>
-            {/* Champ entreprise obligatoire */}
-            <div style={{ marginBottom:14 }}>
-              <label style={{ fontSize:11, color:"#AAAAAA", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>
-                🏢 Nom de l'entreprise *
-              </label>
-              <input
-                style={{ width:"100%", padding:"11px 13px", border:`2px solid ${subCompany.trim()?"#555":"#FF4C1A"}`, borderRadius:10, background:"#1A1A1A", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", color:"#E8E0D4", outline:"none", boxSizing:"border-box" }}
-                placeholder="Acme Corp (obligatoire)"
-                value={subCompany}
-                onChange={e=>setSubCompany(e.target.value)}
-              />
-              {!subCompany.trim() && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4 }}>Requis pour créer votre compte</div>}
-            </div>
-            <button style={{ ...BP, width:"100%", padding:"14px", background:"#FF4C1A", fontSize:15, opacity:!subCompany.trim()?0.5:1 }} onClick={()=>subscribe("annual")} disabled={loading||!subCompany.trim()}>
+            <button style={{ ...BP, width:"100%", padding:"14px", background:"#FF4C1A", fontSize:15 }} onClick={()=>subscribe("annual")} disabled={loading}>
               {loading ? t("loading",lang) : t("subscribe",lang) + " — 59,88€ HT/an →"}
             </button>
             <div style={{ fontSize:11, color:"#AAAAAA", fontFamily:"'Helvetica Neue',sans-serif", textAlign:"center", marginTop:10 }}>
@@ -2614,7 +2423,7 @@ function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
 function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
   const [data, setData]           = useState(null);
   const [loading, setLoading]     = useState(true);
-  const deletedKeyIds             = useRef(new Set()); // persistant — survit aux rechargements
+  const [deletedKeyIds, setDeletedKeyIds] = useState(new Set()); // track locally deleted keys
   const [tab, setTab]             = useState("stats");
   const [genQty, setGenQty]       = useState(1);
   const [genEmail, setGenEmail]   = useState("");
@@ -2642,14 +2451,8 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
     return res.json();
   };
 
-  // Filtre les clés supprimées localement de toute réponse getData
-  const setDataFiltered = (d) => {
-    if (!d) return;
-    setData({ ...d, keys: (d.keys||[]).filter(k => !deletedKeyIds.current.has(k.id)) });
-  };
-
   useEffect(() => {
-    call("getData").then(d => { setDataFiltered(d); setLoading(false); });
+    call("getData").then(d => { setData(d ? {...d, keys: (d.keys||[]).filter(k => !deletedKeyIds.has(k.id))} : d); setLoading(false); });
   }, []);
 
   const generateKeys = async () => {
@@ -2665,8 +2468,11 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
     if (res.success) {
       setNewKeys(res.keys);
       notify(`✅ ${res.message}`);
-      // Ajoute les nouvelles clés au state local sans recharger
-      call("getData").then(d => setDataFiltered(d));
+      // Recharge les données en filtrant les clés supprimées localement
+      // et en attendant un court délai pour que Supabase ait le temps de mettre à jour email_sent
+      setTimeout(() => {
+        call("getData").then(d => setData(d ? {...d, keys: (d.keys||[]).filter(k => !deletedKeyIds.has(k.id))} : d));
+      }, 1500);
     } else {
       notify(res.error || "Erreur", "error");
     }
@@ -2688,7 +2494,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
     if (res.success) {
       setAddedKeys(res.keys);
       notify(`✅ ${res.message}`);
-      call("getData").then(d => setData(d));
+      call("getData").then(d => setData(d ? {...d, keys: (d.keys||[]).filter(k => !deletedKeyIds.has(k.id))} : d));
     } else {
       notify(res.error || "Erreur", "error");
     }
@@ -2698,20 +2504,20 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
   const grantLifetime = async (userId, name) => {
     if (!confirm(`Attribuer une licence GRATUITE À VIE à ${name} ?`)) return;
     const res = await call("grantLifetime", { userId });
-    if (res.success) { notify(`✅ Licence gratuite à vie attribuée à ${name}`); call("getData").then(d => { if(d) setDataFiltered({...d}); }); }
+    if (res.success) { notify(`✅ Licence gratuite à vie attribuée à ${name}`); call("getData").then(d => setData(d ? {...d, keys: (d.keys||[]).filter(k => !deletedKeyIds.has(k.id))} : d)); }
     else notify(res.error, "error");
   };
 
   const disableAccount = async (userId, name) => {
     if (!confirm(`Désactiver le compte de ${name} ?`)) return;
     const res = await call("disableAccount", { userId });
-    if (res.success) { notify(t("kpi_disabled",lang)); call("getData").then(d => { if(d) setDataFiltered({...d}); }); }
+    if (res.success) { notify(t("kpi_disabled",lang)); call("getData").then(d => setData(d ? {...d, keys: (d.keys||[]).filter(k => !deletedKeyIds.has(k.id))} : d)); }
     else notify(res.error, "error");
   };
 
   const extendAccount = async (userId, name) => {
     const res = await call("extendSubscription", { userId, months: 12 });
-    if (res.success) { notify(`✅ ${name} prolongé de 12 mois`); call("getData").then(d => { if(d) setDataFiltered({...d}); }); }
+    if (res.success) { notify(`✅ ${name} prolongé de 12 mois`); call("getData").then(d => setData(d ? {...d, keys: (d.keys||[]).filter(k => !deletedKeyIds.has(k.id))} : d)); }
     else notify(res.error, "error");
   };
 
@@ -2789,9 +2595,8 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
             // ── Core metrics ──
             const totalUsers     = profiles.filter(p => p.email !== "fanne@lafitel.eu").length;
             const trialUsers     = subs.filter(s => s.status === "trial").length;
-            const activeUsers    = subs.filter(s => s.status === "active" && s.stripe_customer_id).length; // uniquement les vrais abonnements Stripe payants
+            const activeUsers    = subs.filter(s => s.status === "active").length;
             const lifetimeUsers  = subs.filter(s => s.status === "lifetime" || (s.current_period_end && new Date(s.current_period_end) > new Date("2099-01-01"))).length;
-            const freeKeyUsers   = subs.filter(s => s.status === "active" && !s.stripe_customer_id).length; // actifs via clé gratuite/manuelle
             const expiredUsers   = subs.filter(s => s.status === "expired").length;
             const cancelledUsers = subs.filter(s => s.status === "cancelled").length;
 
@@ -2886,12 +2691,11 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
                   <div style={{ ...C }}>
                     <h3 style={CT}>État des licences</h3>
                     {[
-                      { label:"Actives (Stripe payant)", value:activeUsers,  color:"#00C48C" },
-                      { label:"Actives (clé manuelle)",  value:freeKeyUsers, color:"#FF9500" },
-                      { label:"En essai",                value:trialUsers,   color:"#1A6AFF" },
-                      { label:t("kpi_lifetime",lang),    value:lifetimeUsers,color:"#FF4C1A" },
-                      { label:t("kpi_expired_keys",lang),value:expiredUsers, color:"#FF2D2D" },
-                      { label:t("kpi_cancelled",lang),   value:cancelledUsers,color:"#888"  },
+                      { label:"Actives (payantes)", value:activeUsers, color:"#00C48C" },
+                      { label:"En essai", value:trialUsers, color:"#1A6AFF" },
+                      { label:t("kpi_lifetime",lang), value:lifetimeUsers, color:"#FF4C1A" },
+                      { label:t("kpi_expired_keys",lang), value:expiredUsers, color:"#FF2D2D" },
+                      { label:t("kpi_cancelled",lang), value:cancelledUsers, color:"#888" },
                     ].map(item => (
                       <div key={item.label} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
                         <div style={{ width:10, height:10, borderRadius:"50%", background:item.color, flexShrink:0 }} />
@@ -3330,9 +3134,9 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
                     <button style={{ border:"none", background:"#FFF0F0", color:"#FF2D2D", cursor:"pointer", fontSize:11, padding:"3px 8px", borderRadius:6, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}
                       onClick={async()=>{
                         if(!confirm("Supprimer cette clé ?")) return;
-                        const { error: delErr } = await supabase.from("activation_keys").delete().eq("id",k.id);
-                        if (delErr) { notify("Erreur suppression", "error"); return; }
-                        deletedKeyIds.current.add(k.id); // mémorisé définitivement
+                        await supabase.from("activation_keys").delete().eq("id",k.id);
+                        // Mise à jour locale immédiate + mémorisation de l'ID supprimé
+                        setDeletedKeyIds(prev => new Set([...prev, k.id]));
                         setData(prev => ({ ...prev, keys: prev.keys.filter(key => key.id !== k.id) }));
                         notify("🗑 Clé supprimée");
                       }}>🗑</button>
@@ -3429,6 +3233,7 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
   const [dbObjectives, setDbObjectives] = useState([]);
   const [allProfiles, setAllProfiles]   = useState([]);
   const [followups, setFollowups]       = useState([]);
+  const [allNotes, setAllNotes]         = useState([]);   // contact_notes avec montants
   const [objForm, setObjForm]     = useState({});
   const [savingObj, setSavingObj] = useState(false);
   const STATUS_COLORS = getStatusColors(lang);
@@ -3444,13 +3249,20 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
     supabase.from("objectives").select("*")
       .eq("manager_id", profile.id)
       .then(({data})=>setDbObjectives(data||[]));
-    // Load followups (today + overdue)
+    // Load followups (today + overdue + this week + next week)
+    const d14 = new Date(); d14.setDate(d14.getDate()+14);
     supabase.from("contact_notes")
       .select("*, contacts:contact_id(first_name,last_name,company,status), profiles:user_id(full_name,email)")
       .not("followup_date","is",null)
-      .lte("followup_date", new Date().toISOString().split("T")[0])
+      .lte("followup_date", d14.toISOString().split("T")[0])
       .order("followup_date", {ascending:true})
       .then(({data})=>setFollowups(data||[]));
+    // Load all contact_notes with amounts for CA calculation
+    supabase.from("contact_notes")
+      .select("id,user_id,amount,currency,contact_status,created_at,contacts:contact_id(status)")
+      .not("amount","is",null)
+      .gt("amount",0)
+      .then(({data})=>setAllNotes(data||[]));
   }, []);
 
   // ── Period filter ──
@@ -3473,6 +3285,30 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
     converti: filtered.filter(c=>c.status==="converti").length,
   };
   const convRate = stats.total > 0 ? Math.round((stats.converti/stats.total)*100) : 0;
+
+  // ── CA helpers ──
+  const filteredNotes = allNotes.filter(n => {
+    const d = new Date(n.created_at);
+    if (period === "week") {
+      const w = new Date(now); w.setDate(now.getDate()-7); return d >= w;
+    }
+    return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+  });
+  const caTotal = filteredNotes.filter(n=>n.currency==="EUR"||!n.currency).reduce((s,n)=>s+(n.amount||0),0);
+  const caParStatut = {
+    chaud:    filteredNotes.filter(n=>n.contacts?.status==="chaud").reduce((s,n)=>s+(n.amount||0),0),
+    converti: filteredNotes.filter(n=>n.contacts?.status==="converti").reduce((s,n)=>s+(n.amount||0),0),
+    tiede:    filteredNotes.filter(n=>n.contacts?.status==="tiede").reduce((s,n)=>s+(n.amount||0),0),
+    froid:    filteredNotes.filter(n=>n.contacts?.status==="froid").reduce((s,n)=>s+(n.amount||0),0),
+  };
+  const caByRep = {};
+  filteredNotes.forEach(n => {
+    if (!n.user_id) return;
+    caByRep[n.user_id] = (caByRep[n.user_id] || 0) + (n.amount || 0);
+  });
+  const fmtCA = (v) => v >= 1000
+    ? (v/1000).toLocaleString("fr-FR",{maximumFractionDigits:1}) + " k€"
+    : v.toLocaleString("fr-FR",{maximumFractionDigits:0}) + " €";
 
   // ── Period keys ──
   const monthKey   = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
@@ -3500,10 +3336,12 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
   }).forEach(c => {
     const uid = c.user_id || c.profiles?.id || "unknown";
     const name = displayName(c.profiles) || "—";
-    if (!byRepId[uid]) byRepId[uid] = { name, total:0, froid:0, tiede:0, chaud:0, converti:0, userId:uid };
+    if (!byRepId[uid]) byRepId[uid] = { name, total:0, froid:0, tiede:0, chaud:0, converti:0, userId:uid, ca:0 };
     byRepId[uid].total++;
     byRepId[uid][c.status] = (byRepId[uid][c.status]||0)+1;
   });
+  // Attacher CA à chaque rep
+  Object.keys(byRepId).forEach(uid => { byRepId[uid].ca = caByRep[uid] || 0; });
   const repList = Object.values(byRepId).sort((a,b)=>b.total-a.total);
 
   // ── Save objectives to Supabase ──
@@ -3537,14 +3375,17 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
   // ── Export Excel ──
   const exportExcel = () => {
     let csv = "\uFEFF";
-    csv += ["Commercial","Total","Froid","Tiède","Chaud","Converti","Tx Conv%","Obj Mensuel","Obj Trimestriel","Obj Annuel"].join(";")+"\n";
+    csv += ["Commercial","Total","Froid","Tiède","Chaud","Converti","Tx Conv%","CA (€)","CA Obj Mensuel (€)","Obj Mensuel","Obj Trimestriel","Obj Annuel"].join(";")+"\n";
     repList.forEach(r => {
       const conv = r.total>0?Math.round((r.converti/r.total)*100):0;
       const om = getObj(r.userId,"monthly",monthKey);
       const oq = getObj(r.userId,"quarterly",quarterKey);
       const oa = getObj(r.userId,"annual",yearKey);
-      csv += [r.name,r.total,r.froid,r.tiede,r.chaud,r.converti,conv+"%",om||"—",oq||"—",oa||"—"].join(";")+"\n";
+      const caObj = getObj(r.userId,"ca_monthly",monthKey);
+      csv += [r.name,r.total,r.froid,r.tiede,r.chaud,r.converti,conv+"%",Math.round(r.ca),caObj||"—",om||"—",oq||"—",oa||"—"].join(";")+"\n";
     });
+    const totalCA = repList.reduce((s,r)=>s+r.ca,0);
+    csv += ["TOTAL","","","","","","",Math.round(totalCA),"","","",""].join(";")+"\n";
     const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href=url; a.download=`objectifs-${monthKey}.csv`; a.click();
@@ -3634,7 +3475,8 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
                 <div style={{ fontSize:13, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A", marginBottom:8 }}>
                   👤 {displayName(rep)}
                 </div>
-                <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)", gap:8 }}>
+                <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:6, fontWeight:600 }}>📊 Objectifs prospects</div>
+                <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)", gap:8, marginBottom:10 }}>
                   {[
                     { key:"monthly",   label:t("mgr_monthly",lang),   auto:null },
                     { key:"weekly",    label:"Sem.",                   auto:monthly>0?Math.round(monthly/4):0 },
@@ -3664,6 +3506,19 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
                     </div>
                   ))}
                 </div>
+                {/* Objectif CA mensuel */}
+                <div style={{ fontSize:11, color:"#1A6AFF", fontFamily:"'Helvetica Neue',sans-serif", marginBottom:6, fontWeight:600 }}>💰 Objectif CA mensuel (€)</div>
+                <div style={{ maxWidth:200 }}>
+                  <input style={{ ...I, padding:"8px 10px" }} type="number" min="0" placeholder="Ex: 50000"
+                    value={repForm.ca_monthly||getObj(rep.id,"ca_monthly",monthKey)||""}
+                    onChange={e=>{
+                      setObjForm(p=>({
+                        ...p,
+                        [rep.id]: { ...(p[rep.id]||{}), ca_monthly: e.target.value }
+                      }));
+                    }}
+                  />
+                </div>
               </div>
             );
           })}
@@ -3683,37 +3538,56 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
       </div>
 
       {/* ── KPIs globaux ── */}
-      <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(5,1fr)", gap:10, marginBottom:16 }}>
+      <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(6,1fr)", gap:10, marginBottom:16 }}>
         {[
           { label:t("mgr_prospects_added",lang), value:stats.total,    bg:"#1A1A1A", fg:"#E8E0D4" },
           { label:STATUS_COLORS.froid?.label,    value:stats.froid,    bg:STATUS_COLORS.froid?.bg,    fg:STATUS_COLORS.froid?.text    },
           { label:STATUS_COLORS.tiede?.label,    value:stats.tiede,    bg:STATUS_COLORS.tiede?.bg,    fg:STATUS_COLORS.tiede?.text    },
           { label:STATUS_COLORS.chaud?.label,    value:stats.chaud,    bg:STATUS_COLORS.chaud?.bg,    fg:STATUS_COLORS.chaud?.text    },
           { label:STATUS_COLORS.converti?.label, value:stats.converti, bg:STATUS_COLORS.converti?.bg, fg:STATUS_COLORS.converti?.text },
+          { label:"💰 CA équipe",                value:fmtCA(caTotal), bg:"#1A6AFF",  fg:"#fff",  isCA:true },
         ].map(k=>(
           <div key={k.label} style={{ background:k.bg, borderRadius:12, padding:14 }}>
-            <div style={{ fontSize:28, fontWeight:700, color:k.fg, lineHeight:1 }}>{k.value}</div>
+            <div style={{ fontSize:k.isCA?18:28, fontWeight:700, color:k.fg, lineHeight:1 }}>{k.value}</div>
             <div style={{ fontSize:10, color:k.fg, opacity:0.8, fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5, marginTop:4 }}>{k.label}</div>
           </div>
         ))}
       </div>
 
+      {/* CA par statut */}
+      {caTotal > 0 && (
+        <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)", gap:8, marginBottom:16 }}>
+          {[
+            { label:"CA Froid",    value:caParStatut.froid,    bg:STATUS_COLORS.froid?.bg,    fg:STATUS_COLORS.froid?.text    },
+            { label:"CA Tiède",    value:caParStatut.tiede,    bg:STATUS_COLORS.tiede?.bg,    fg:STATUS_COLORS.tiede?.text    },
+            { label:"CA Chaud 🔥", value:caParStatut.chaud,    bg:STATUS_COLORS.chaud?.bg,    fg:STATUS_COLORS.chaud?.text    },
+            { label:"CA Converti ✅",value:caParStatut.converti,bg:STATUS_COLORS.converti?.bg, fg:STATUS_COLORS.converti?.text },
+          ].map(k=>(
+            <div key={k.label} style={{ background:k.bg, borderRadius:10, padding:"10px 12px" }}>
+              <div style={{ fontSize:15, fontWeight:700, color:k.fg, lineHeight:1 }}>{fmtCA(k.value)}</div>
+              <div style={{ fontSize:9, color:k.fg, opacity:0.8, fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:0.5, marginTop:3 }}>{k.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ── Objectifs & Progression ── */}
-      <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr 1fr", gap:12, marginBottom:16 }}>
+      <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"repeat(4,1fr)", gap:12, marginBottom:16 }}>
         {[
           { label:t("mgr_monthly",lang),   value:stats.total,  target:repList.reduce((s,r)=>s+getObj(r.userId,"monthly",monthKey),0),   note:`${now.toLocaleDateString([],{month:"long"})}` },
           { label:t("mgr_quarterly",lang), value:quarterTotal, target:repList.reduce((s,r)=>s+getObj(r.userId,"quarterly",quarterKey),0), note:`Q${Math.ceil((now.getMonth()+1)/3)} ${now.getFullYear()}` },
           { label:t("mgr_annual",lang),    value:annualTotal,  target:repList.reduce((s,r)=>s+getObj(r.userId,"annual",yearKey),0),       note:`${now.getFullYear()}` },
+          { label:"💰 CA vs Objectif",     value:caTotal,      target:repList.reduce((s,r)=>s+getObj(r.userId,"ca_monthly",monthKey),0),  note:`${now.toLocaleDateString([],{month:"long"})}`, isCA:true },
         ].map(obj=>(
           <div key={obj.label} style={C}>
             <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10 }}>
               <div>
-                <div style={{ fontSize:11, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:1, fontWeight:600 }}>{obj.label}</div>
+                <div style={{ fontSize:11, color:obj.isCA?"#1A6AFF":"#888", fontFamily:"'Helvetica Neue',sans-serif", textTransform:"uppercase", letterSpacing:1, fontWeight:600 }}>{obj.label}</div>
                 <div style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif" }}>{obj.note}</div>
               </div>
-              <div style={{ fontSize:22, fontWeight:700, color:"#1A1A1A" }}>{obj.value}</div>
+              <div style={{ fontSize:obj.isCA?16:22, fontWeight:700, color:"#1A1A1A" }}>{obj.isCA?fmtCA(obj.value):obj.value}</div>
             </div>
-            <ProgressBar value={obj.value} target={obj.target} />
+            <ProgressBar value={obj.value} target={obj.target} color={obj.isCA?"#1A6AFF":"#FF4C1A"} />
             {!obj.target && (
               <div style={{ fontSize:11, color:"#aaa", fontFamily:"'Helvetica Neue',sans-serif", marginTop:6, fontStyle:"italic" }}>
                 {t("mgr_set_obj",lang)} →
@@ -3781,15 +3655,22 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
           <div>
             {repList.map(r => {
               const repConv = r.total > 0 ? Math.round((r.converti/r.total)*100) : 0;
-              const objM = getObj(r.userId,"monthly",monthKey);
-              const pct  = objM > 0 ? Math.min(100, Math.round((r.total/objM)*100)) : null;
+              const objM    = getObj(r.userId,"monthly",monthKey);
+              const pct     = objM > 0 ? Math.min(100, Math.round((r.total/objM)*100)) : null;
+              const caObjM  = getObj(r.userId,"ca_monthly",monthKey);
+              const caPct   = caObjM > 0 ? Math.min(100, Math.round((r.ca/caObjM)*100)) : null;
               return (
                 <div key={r.userId} style={{ padding:"12px 0", borderBottom:"1px solid #F0EBE0" }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
                     <div style={{ fontSize:14, fontWeight:600, fontFamily:"'Helvetica Neue',sans-serif", color:"#1A1A1A" }}>{r.name}</div>
-                    <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                    <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap" }}>
                       <span style={{ fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#888" }}>{r.total} prospects</span>
                       <span style={{ fontSize:11, fontWeight:700, color:"#00C48C", background:"#EBF8F4", padding:"2px 8px", borderRadius:20, fontFamily:"'Helvetica Neue',sans-serif" }}>{repConv}% conv.</span>
+                      {r.ca > 0 && (
+                        <span style={{ fontSize:11, fontWeight:700, color:"#1A6AFF", background:"#EEF6FF", padding:"2px 8px", borderRadius:20, fontFamily:"'Helvetica Neue',sans-serif" }}>
+                          💰 {fmtCA(r.ca)}
+                        </span>
+                      )}
                     </div>
                   </div>
                   {/* Barre statuts */}
@@ -3798,15 +3679,27 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
                       r[st] > 0 && <div key={st} style={{ flex:r[st], background:STATUS_COLORS[st]?.bg }} />
                     ))}
                   </div>
-                  {/* Objectif mensuel */}
+                  {/* Objectif prospects mensuel */}
                   {objM > 0 && (
                     <div style={{ marginTop:6 }}>
                       <div style={{ display:"flex", justifyContent:"space-between", marginBottom:2 }}>
-                        <span style={{ fontSize:10, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>Obj. mensuel: {r.total}/{objM}</span>
+                        <span style={{ fontSize:10, color:"#888", fontFamily:"'Helvetica Neue',sans-serif" }}>Obj. prospects: {r.total}/{objM}</span>
                         <span style={{ fontSize:10, fontWeight:700, color:pct>=100?"#00C48C":"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif" }}>{pct}%</span>
                       </div>
                       <div style={{ height:5, background:"#F0EBE0", borderRadius:3, overflow:"hidden" }}>
                         <div style={{ height:"100%", width:`${pct}%`, background:pct>=100?"#00C48C":"#FF4C1A", borderRadius:3 }} />
+                      </div>
+                    </div>
+                  )}
+                  {/* Objectif CA mensuel */}
+                  {caObjM > 0 && (
+                    <div style={{ marginTop:6 }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:2 }}>
+                        <span style={{ fontSize:10, color:"#1A6AFF", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600 }}>💰 CA: {fmtCA(r.ca)} / {fmtCA(caObjM)}</span>
+                        <span style={{ fontSize:10, fontWeight:700, color:caPct>=100?"#00C48C":"#1A6AFF", fontFamily:"'Helvetica Neue',sans-serif" }}>{caPct}%</span>
+                      </div>
+                      <div style={{ height:5, background:"#EEF6FF", borderRadius:3, overflow:"hidden" }}>
+                        <div style={{ height:"100%", width:`${caPct}%`, background:caPct>=100?"#00C48C":"#1A6AFF", borderRadius:3 }} />
                       </div>
                     </div>
                   )}
@@ -3829,10 +3722,9 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
 
 
 function ExpiredWall({ profile, subscription, isMobile, lang="fr", onActivate }) {
-  const [key, setKey]           = useState("");
-  const [loading, setLoading]   = useState(false);
-  const [wallCompany, setWallCompany] = useState(profile?.company || "");
-  const [notify, setNotify]     = useState(null);
+  const [key, setKey]         = useState("");
+  const [loading, setLoading] = useState(false);
+  const [notify, setNotify]   = useState(null);
 
   const showNotif = (msg, type="ok") => {
     setNotify({ msg, type });
@@ -3840,13 +3732,12 @@ function ExpiredWall({ profile, subscription, isMobile, lang="fr", onActivate })
   };
 
   const subscribe = async () => {
-    if (!wallCompany.trim()) { showNotif("Veuillez saisir le nom de votre entreprise", "error"); return; }
     setLoading(true);
     try {
       const res = await fetch("/api/stripe-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: profile.email, userId: profile.id, quantity: 1, companyName: wallCompany.trim() }),
+        body: JSON.stringify({ email: profile.email, userId: profile.id, quantity: 1 }),
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
@@ -3906,22 +3797,9 @@ function ExpiredWall({ profile, subscription, isMobile, lang="fr", onActivate })
           <div style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4 }}>Facturé 59,88€ HT/an · Engagement 12 mois</div>
         </div>
 
-        {/* Champ entreprise obligatoire */}
-        <div style={{ marginBottom:14, textAlign:"left" }}>
-          <label style={{ fontSize:11, color:"#AAAAAA", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>
-            🏢 Nom de l'entreprise *
-          </label>
-          <input
-            style={{ width:"100%", padding:"11px 13px", border:`2px solid ${wallCompany.trim()?"#555":"#FF4C1A"}`, borderRadius:10, background:"#1A1A1A", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", color:"#E8E0D4", outline:"none", boxSizing:"border-box" }}
-            placeholder="Acme Corp (obligatoire)"
-            value={wallCompany}
-            onChange={e=>setWallCompany(e.target.value)}
-          />
-        </div>
-
         {/* Bouton paiement */}
-        <button style={{ width:"100%", padding:"14px", background:"#FF4C1A", color:"#fff", border:"none", borderRadius:10, cursor:wallCompany.trim()?"pointer":"default", fontSize:15, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:700, marginBottom:16, opacity:wallCompany.trim()?1:0.5 }}
-          onClick={subscribe} disabled={loading||!wallCompany.trim()}>
+        <button style={{ width:"100%", padding:"14px", background:"#FF4C1A", color:"#fff", border:"none", borderRadius:10, cursor:"pointer", fontSize:15, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:700, marginBottom:16 }}
+          onClick={subscribe} disabled={loading}>
           {loading ? t("loading",lang) : t("subscribe",lang) + " →"}
         </button>
 
