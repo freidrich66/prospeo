@@ -1996,14 +1996,19 @@ function SubscriptionView({ profile, subscription, isMobile, lang="fr", notify, 
   const [addingMore, setAddingMore]  = useState(false);
   const [loading, setLoading] = useState(false);
   const [showActivate, setShowActivate] = useState(false);
+  const [subCompany, setSubCompany]     = useState(profile?.company || "");
 
   const subscribe = async (plan) => {
+    if (!subCompany.trim()) {
+      notify("Veuillez saisir le nom de votre entreprise", "error");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/stripe-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan, email: profile.email, userId: profile.id }),
+        body: JSON.stringify({ plan, email: profile.email, userId: profile.id, companyName: subCompany.trim() }),
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
@@ -2060,7 +2065,20 @@ function SubscriptionView({ profile, subscription, isMobile, lang="fr", notify, 
                 <div key={f} style={{ fontSize:12, fontFamily:"'Helvetica Neue',sans-serif", color:"#aaa" }}>{f}</div>
               ))}
             </div>
-            <button style={{ ...BP, width:"100%", padding:"14px", background:"#FF4C1A", fontSize:15 }} onClick={()=>subscribe("annual")} disabled={loading}>
+            {/* Champ entreprise obligatoire */}
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:11, color:"#AAAAAA", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>
+                🏢 Nom de l'entreprise *
+              </label>
+              <input
+                style={{ width:"100%", padding:"11px 13px", border:`2px solid ${subCompany.trim()?"#555":"#FF4C1A"}`, borderRadius:10, background:"#1A1A1A", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", color:"#E8E0D4", outline:"none", boxSizing:"border-box" }}
+                placeholder="Acme Corp (obligatoire)"
+                value={subCompany}
+                onChange={e=>setSubCompany(e.target.value)}
+              />
+              {!subCompany.trim() && <div style={{ fontSize:11, color:"#FF4C1A", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4 }}>Requis pour créer votre compte</div>}
+            </div>
+            <button style={{ ...BP, width:"100%", padding:"14px", background:"#FF4C1A", fontSize:15, opacity:!subCompany.trim()?0.5:1 }} onClick={()=>subscribe("annual")} disabled={loading||!subCompany.trim()}>
               {loading ? t("loading",lang) : t("subscribe",lang) + " — 59,88€ HT/an →"}
             </button>
             <div style={{ fontSize:11, color:"#AAAAAA", fontFamily:"'Helvetica Neue',sans-serif", textAlign:"center", marginTop:10 }}>
@@ -3634,9 +3652,10 @@ function MgrDashboardView({ contacts, profile, isMobile, lang="fr", notify }) {
 
 
 function ExpiredWall({ profile, subscription, isMobile, lang="fr", onActivate }) {
-  const [key, setKey]         = useState("");
-  const [loading, setLoading] = useState(false);
-  const [notify, setNotify]   = useState(null);
+  const [key, setKey]           = useState("");
+  const [loading, setLoading]   = useState(false);
+  const [wallCompany, setWallCompany] = useState(profile?.company || "");
+  const [notify, setNotify]     = useState(null);
 
   const showNotif = (msg, type="ok") => {
     setNotify({ msg, type });
@@ -3644,12 +3663,13 @@ function ExpiredWall({ profile, subscription, isMobile, lang="fr", onActivate })
   };
 
   const subscribe = async () => {
+    if (!wallCompany.trim()) { showNotif("Veuillez saisir le nom de votre entreprise", "error"); return; }
     setLoading(true);
     try {
       const res = await fetch("/api/stripe-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: profile.email, userId: profile.id, quantity: 1 }),
+        body: JSON.stringify({ email: profile.email, userId: profile.id, quantity: 1, companyName: wallCompany.trim() }),
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
@@ -3709,9 +3729,22 @@ function ExpiredWall({ profile, subscription, isMobile, lang="fr", onActivate })
           <div style={{ fontSize:12, color:"#888", fontFamily:"'Helvetica Neue',sans-serif", marginTop:4 }}>Facturé 59,88€ HT/an · Engagement 12 mois</div>
         </div>
 
+        {/* Champ entreprise obligatoire */}
+        <div style={{ marginBottom:14, textAlign:"left" }}>
+          <label style={{ fontSize:11, color:"#AAAAAA", fontFamily:"'Helvetica Neue',sans-serif", fontWeight:600, textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:6 }}>
+            🏢 Nom de l'entreprise *
+          </label>
+          <input
+            style={{ width:"100%", padding:"11px 13px", border:`2px solid ${wallCompany.trim()?"#555":"#FF4C1A"}`, borderRadius:10, background:"#1A1A1A", fontSize:14, fontFamily:"'Helvetica Neue',sans-serif", color:"#E8E0D4", outline:"none", boxSizing:"border-box" }}
+            placeholder="Acme Corp (obligatoire)"
+            value={wallCompany}
+            onChange={e=>setWallCompany(e.target.value)}
+          />
+        </div>
+
         {/* Bouton paiement */}
-        <button style={{ width:"100%", padding:"14px", background:"#FF4C1A", color:"#fff", border:"none", borderRadius:10, cursor:"pointer", fontSize:15, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:700, marginBottom:16 }}
-          onClick={subscribe} disabled={loading}>
+        <button style={{ width:"100%", padding:"14px", background:"#FF4C1A", color:"#fff", border:"none", borderRadius:10, cursor:wallCompany.trim()?"pointer":"default", fontSize:15, fontFamily:"'Helvetica Neue',sans-serif", fontWeight:700, marginBottom:16, opacity:wallCompany.trim()?1:0.5 }}
+          onClick={subscribe} disabled={loading||!wallCompany.trim()}>
           {loading ? t("loading",lang) : t("subscribe",lang) + " →"}
         </button>
 
