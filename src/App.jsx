@@ -2614,6 +2614,7 @@ function CRMConfigView({ profile, isMobile, lang="fr", notify }) {
 function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
   const [data, setData]           = useState(null);
   const [loading, setLoading]     = useState(true);
+  const deletedKeyIds             = useRef(new Set()); // persistant — survit aux rechargements
   const [tab, setTab]             = useState("stats");
   const [genQty, setGenQty]       = useState(1);
   const [genEmail, setGenEmail]   = useState("");
@@ -2641,8 +2642,14 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
     return res.json();
   };
 
+  // Filtre les clés supprimées localement de toute réponse getData
+  const setDataFiltered = (d) => {
+    if (!d) return;
+    setData({ ...d, keys: (d.keys||[]).filter(k => !deletedKeyIds.current.has(k.id)) });
+  };
+
   useEffect(() => {
-    call("getData").then(d => { setData(d); setLoading(false); });
+    call("getData").then(d => { setDataFiltered(d); setLoading(false); });
   }, []);
 
   const generateKeys = async () => {
@@ -2658,11 +2665,8 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
     if (res.success) {
       setNewKeys(res.keys);
       notify(`✅ ${res.message}`);
-      // Recharge les données en filtrant les clés supprimées localement
-      // et en attendant un court délai pour que Supabase ait le temps de mettre à jour email_sent
-      setTimeout(() => {
-        call("getData").then(d => setData(d));
-      }, 1500);
+      // Ajoute les nouvelles clés au state local sans recharger
+      call("getData").then(d => setDataFiltered(d));
     } else {
       notify(res.error || "Erreur", "error");
     }
@@ -2694,20 +2698,20 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
   const grantLifetime = async (userId, name) => {
     if (!confirm(`Attribuer une licence GRATUITE À VIE à ${name} ?`)) return;
     const res = await call("grantLifetime", { userId });
-    if (res.success) { notify(`✅ Licence gratuite à vie attribuée à ${name}`); call("getData").then(d => setData(d)); }
+    if (res.success) { notify(`✅ Licence gratuite à vie attribuée à ${name}`); call("getData").then(d => { if(d) setDataFiltered({...d}); }); }
     else notify(res.error, "error");
   };
 
   const disableAccount = async (userId, name) => {
     if (!confirm(`Désactiver le compte de ${name} ?`)) return;
     const res = await call("disableAccount", { userId });
-    if (res.success) { notify(t("kpi_disabled",lang)); call("getData").then(d => setData(d)); }
+    if (res.success) { notify(t("kpi_disabled",lang)); call("getData").then(d => { if(d) setDataFiltered({...d}); }); }
     else notify(res.error, "error");
   };
 
   const extendAccount = async (userId, name) => {
     const res = await call("extendSubscription", { userId, months: 12 });
-    if (res.success) { notify(`✅ ${name} prolongé de 12 mois`); call("getData").then(d => setData(d)); }
+    if (res.success) { notify(`✅ ${name} prolongé de 12 mois`); call("getData").then(d => { if(d) setDataFiltered({...d}); }); }
     else notify(res.error, "error");
   };
 
@@ -3328,7 +3332,7 @@ function SuperAdminView({ profile, isMobile, lang="fr", notify }) {
                         if(!confirm("Supprimer cette clé ?")) return;
                         const { error: delErr } = await supabase.from("activation_keys").delete().eq("id",k.id);
                         if (delErr) { notify("Erreur suppression", "error"); return; }
-                        // Mise à jour locale immédiate — pas de rechargement
+                        deletedKeyIds.current.add(k.id); // mémorisé définitivement
                         setData(prev => ({ ...prev, keys: prev.keys.filter(key => key.id !== k.id) }));
                         notify("🗑 Clé supprimée");
                       }}>🗑</button>
