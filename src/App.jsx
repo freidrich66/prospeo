@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, createContext, useContext } from "react";
 import { supabase } from "./supabase.js";
 import { LANGUAGES, t, detectBrowserLang, getSavedLang, saveLang } from "./i18n.js";
 
@@ -17,8 +17,8 @@ const DEFAULT_THEME = THEMES[0];
 function getTheme(id) { return THEMES.find(th=>th.id===id) || DEFAULT_THEME; }
 
 // React Context pour le thème — accessible partout sans prop drilling
-const ThemeContext = React.createContext({ theme: DEFAULT_THEME, applyTheme: ()=>{} });
-const useTheme = () => React.useContext(ThemeContext);
+const ThemeContext = createContext({ theme: DEFAULT_THEME, applyTheme: ()=>{} });
+const useTheme = () => useContext(ThemeContext);
 
 function loadSavedTheme() {
   try { return localStorage.getItem("prospeo_theme") || "sand"; } catch(e) { return "sand"; }
