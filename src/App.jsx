@@ -4,17 +4,21 @@ import { LANGUAGES, t, detectBrowserLang, getSavedLang, saveLang } from "./i18n.
 
 // ── Thèmes de l'application ──────────────────────────────────
 const THEMES = [
-  { id:"sand",    name:"Sable",       bg:"F5F0E8", sidebar:"1A1A1A", accent:"FF4C1A", card:"FFFFFF", text:"1A1A1A", preview:["F5F0E8","FF4C1A","1A1A1A"] },
-  { id:"slate",   name:"Ardoise",     bg:"F0F4F8", sidebar:"2D3748", accent:"3B82F6", card:"FFFFFF", text:"1A202C", preview:["F0F4F8","3B82F6","2D3748"] },
-  { id:"forest",  name:"Forêt",       bg:"F0F5F1", sidebar:"1A3D2B", accent:"10B981", card:"FFFFFF", text:"1A3D2B", preview:["F0F5F1","10B981","1A3D2B"] },
-  { id:"night",   name:"Nuit",        bg:"1A1A2E", sidebar:"16213E", accent:"E94560", card:"242435", text:"E8E0D4", preview:["1A1A2E","E94560","16213E"] },
-  { id:"lavande", name:"Lavande",     bg:"F5F3FF", sidebar:"4C1D95", accent:"8B5CF6", card:"FFFFFF", text:"1A1A1A", preview:["F5F3FF","8B5CF6","4C1D95"] },
-  { id:"rose",    name:"Rose",        bg:"FFF5F7", sidebar:"831843", accent:"EC4899", card:"FFFFFF", text:"1A1A1A", preview:["FFF5F7","EC4899","831843"] },
+  { id:"sand",    name:{ fr:"Sable",    en:"Sand",     es:"Arena",   pt:"Areia",   it:"Sabbia",  de:"Sand",     no:"Sand",    sv:"Sand",    nl:"Zand",    zh:"沙色" }, bg:"F5F0E8", sidebar:"1A1A1A", accent:"FF4C1A", card:"FFFFFF", cardBorder:"F0EBE3", text:"1A1A1A", subtext:"888888", inputBorder:"E8E0D4", preview:["F5F0E8","FF4C1A","1A1A1A"] },
+  { id:"slate",   name:{ fr:"Ardoise",  en:"Slate",    es:"Pizarra", pt:"Ardósia", it:"Ardesia", de:"Schiefer", no:"Skifer",  sv:"Skiffer", nl:"Leisteen", zh:"石板" }, bg:"EEF2F7", sidebar:"2D3748", accent:"3B82F6", card:"FFFFFF", cardBorder:"E2E8F0", text:"1A202C", subtext:"718096", inputBorder:"CBD5E0", preview:["EEF2F7","3B82F6","2D3748"] },
+  { id:"forest",  name:{ fr:"Forêt",    en:"Forest",   es:"Bosque",  pt:"Floresta",it:"Foresta", de:"Wald",     no:"Skog",    sv:"Skog",    nl:"Woud",    zh:"森林" }, bg:"EDF5EF", sidebar:"1A3D2B", accent:"10B981", card:"FFFFFF", cardBorder:"D1FAE5", text:"1A3D2B", subtext:"6B7280", inputBorder:"A7F3D0", preview:["EDF5EF","10B981","1A3D2B"] },
+  { id:"night",   name:{ fr:"Nuit",     en:"Night",    es:"Noche",   pt:"Noite",   it:"Notte",   de:"Nacht",    no:"Natt",    sv:"Natt",    nl:"Nacht",   zh:"夜晚" }, bg:"1A1A2E", sidebar:"16213E", accent:"E94560", card:"242435", cardBorder:"2D2D45", text:"E8E0D4", subtext:"9CA3AF", inputBorder:"3A3A5C", preview:["1A1A2E","E94560","16213E"] },
+  { id:"lavande", name:{ fr:"Lavande",  en:"Lavender", es:"Lavanda", pt:"Lavanda", it:"Lavanda", de:"Lavendel", no:"Lavendel",sv:"Lavendel",nl:"Lavendel", zh:"薰衣草" }, bg:"F5F3FF", sidebar:"4C1D95", accent:"8B5CF6", card:"FFFFFF", cardBorder:"DDD6FE", text:"1A1A1A", subtext:"6B7280", inputBorder:"C4B5FD", preview:["F5F3FF","8B5CF6","4C1D95"] },
+  { id:"rose",    name:{ fr:"Rose",     en:"Rose",     es:"Rosa",    pt:"Rosa",    it:"Rosa",    de:"Rosa",     no:"Rose",    sv:"Rosa",    nl:"Roze",    zh:"玫瑰" }, bg:"FFF5F7", sidebar:"831843", accent:"EC4899", card:"FFFFFF", cardBorder:"FCE7F3", text:"1A1A1A", subtext:"6B7280", inputBorder:"F9A8D4", preview:["FFF5F7","EC4899","831843"] },
 ];
 
 const DEFAULT_THEME = THEMES[0];
 
-function getTheme(id) { return THEMES.find(t=>t.id===id) || DEFAULT_THEME; }
+function getTheme(id) { return THEMES.find(th=>th.id===id) || DEFAULT_THEME; }
+
+// React Context pour le thème — accessible partout sans prop drilling
+const ThemeContext = React.createContext({ theme: DEFAULT_THEME, applyTheme: ()=>{} });
+const useTheme = () => React.useContext(ThemeContext);
 
 function loadSavedTheme() {
   try { return localStorage.getItem("prospeo_theme") || "sand"; } catch(e) { return "sand"; }
@@ -205,6 +209,16 @@ const globalCSS = `
   input, textarea { -webkit-appearance: none; appearance: none; }
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
+  :root {
+    --c-bg: #F5F0E8;
+    --c-accent: #FF4C1A;
+    --c-sidebar: #1A1A1A;
+    --c-card: #FFFFFF;
+    --c-border: #F0EBE3;
+    --c-text: #1A1A1A;
+    --c-subtext: #888888;
+    --c-input-border: #E8E0D4;
+  }
 `;
 
 export default function App() {
@@ -301,11 +315,19 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
   const theme = getTheme(themeId);
   const isMobile = useIsMobile();
 
-  // Applique la couleur de fond sur le body
+  // Applique les variables CSS du thème sur :root
   useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--c-bg",           "#" + theme.bg);
+    root.style.setProperty("--c-accent",       "#" + theme.accent);
+    root.style.setProperty("--c-sidebar",      "#" + theme.sidebar);
+    root.style.setProperty("--c-card",         "#" + theme.card);
+    root.style.setProperty("--c-border",       "#" + theme.cardBorder);
+    root.style.setProperty("--c-text",         "#" + theme.text);
+    root.style.setProperty("--c-subtext",      "#" + theme.subtext);
+    root.style.setProperty("--c-input-border", "#" + theme.inputBorder);
     document.body.style.background = "#" + theme.bg;
-    return () => { document.body.style.background = ""; };
-  }, [theme.bg]);
+  }, [themeId]);
 
   // Charge le thème sauvegardé dans Supabase au démarrage
   useEffect(() => {
@@ -395,6 +417,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
   }
 
   return (
+    <ThemeContext.Provider value={{ theme, applyTheme }}>
     <div style={{ display:"flex", minHeight:"100vh", background:"#"+theme.bg, fontFamily:"Georgia,serif" }}>
 
       {notif && (
@@ -405,7 +428,7 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
 
       {/* Desktop sidebar */}
       {!isMobile && (
-        <aside style={{ width:240, minHeight:"100vh", background:"#1A1A1A", display:"flex", flexDirection:"column", padding:"28px 0", flexShrink:0, position:"sticky", top:0, height:"100vh" }}>
+        <aside style={{ width:240, minHeight:"100vh", background:"var(--c-sidebar)", display:"flex", flexDirection:"column", padding:"28px 0", flexShrink:0, position:"sticky", top:0, height:"100vh" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, padding:"0 24px 22px", borderBottom:"1px solid #2A2A2A", marginBottom:14 }}>
             <span style={{ fontSize:22, color:"#FF4C1A" }}>◈</span>
             <span style={{ fontSize:17, fontWeight:700, letterSpacing:4, color:"#E8E0D4", fontFamily:"'Helvetica Neue',sans-serif" }}>PROSPEO</span>
@@ -2125,7 +2148,7 @@ function ProfileView({ profile, isMobile, notify, lang="fr", changeLang, theme, 
                       ))}
                     </div>
                     <div style={{ fontSize:11, fontWeight:isActive?700:400, color:isActive?"#"+th.accent:"#444", fontFamily:"'Helvetica Neue',sans-serif" }}>
-                      {th.name}
+                      {th.name[lang] || th.name.fr}
                     </div>
                     {isActive && (
                       <div style={{ fontSize:9, color:"#"+th.accent, fontFamily:"'Helvetica Neue',sans-serif", marginTop:2 }}>✓ Actif</div>
@@ -4086,14 +4109,14 @@ function Loader() {
 }
 
 const P  = (m) => ({ padding: m ? "18px 16px 22px" : "36px 44px", maxWidth: 1100 });
-const T  = (m) => ({ fontSize: m ? 24 : 32, fontWeight: 400, color: "#1A1A1A", margin: "0 0 4px", letterSpacing: -0.5, fontFamily: "Georgia,serif" });
-const Sub = { fontSize: 12, color: "#888", margin: 0, fontFamily: "'Helvetica Neue',sans-serif" };
-const C  = { background: "#fff", borderRadius: 14, padding: 18, boxShadow: "0 2px 10px rgba(0,0,0,0.06)" };
-const CT = { fontSize: 10, fontFamily: "'Helvetica Neue',sans-serif", letterSpacing: 2, textTransform: "uppercase", color: "#888", margin: "0 0 14px", fontWeight: 600 };
+const T  = (m) => ({ fontSize: m ? 24 : 32, fontWeight: 400, color: "var(--c-text)", margin: "0 0 4px", letterSpacing: -0.5, fontFamily: "Georgia,serif" });
+const Sub = { fontSize: 12, color: "var(--c-subtext)", margin: 0, fontFamily: "'Helvetica Neue',sans-serif" };
+const C  = { background: "var(--c-card)", borderRadius: 14, padding: 18, boxShadow: "0 2px 10px rgba(0,0,0,0.06)", border: "1px solid var(--c-border)" };
+const CT = { fontSize: 10, fontFamily: "'Helvetica Neue',sans-serif", letterSpacing: 2, textTransform: "uppercase", color: "var(--c-subtext)", margin: "0 0 14px", fontWeight: 600 };
 const AV = { width: 40, height: 40, borderRadius: "50%", background: "#1A1A1A", color: "#E8E0D4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, fontFamily: "'Helvetica Neue',sans-serif", flexShrink: 0 };
 const SB = { fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, fontFamily: "'Helvetica Neue',sans-serif", letterSpacing: 0.5, textTransform: "uppercase" };
-const L  = { fontSize: 11, fontFamily: "'Helvetica Neue',sans-serif", fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "#666", display: "block", marginBottom: 5 };
-const I  = { width: "100%", padding: "11px 13px", border: "2px solid #E8E0D4", borderRadius: 10, background: "#fff", fontSize: 15, fontFamily: "'Helvetica Neue',sans-serif", color: "#1A1A1A", outline: "none", boxSizing: "border-box" };
-const BP = { padding: "12px 18px", background: "#1A1A1A", color: "#E8E0D4", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 14, fontFamily: "'Helvetica Neue',sans-serif", fontWeight: 600, textAlign: "center" };
-const BS = { padding: "12px 18px", background: "transparent", color: "#666", border: "2px solid #E8E0D4", borderRadius: 10, cursor: "pointer", fontSize: 14, fontFamily: "'Helvetica Neue',sans-serif", textAlign: "center" };
-const LT = { padding: 28, textAlign: "center", color: "#aaa", fontFamily: "'Helvetica Neue',sans-serif" };
+const L  = { fontSize: 11, fontFamily: "'Helvetica Neue',sans-serif", fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--c-subtext)", display: "block", marginBottom: 5 };
+const I  = { width: "100%", padding: "11px 13px", border: "2px solid var(--c-border)", borderRadius: 10, background: "var(--c-card)", fontSize: 15, fontFamily: "'Helvetica Neue',sans-serif", color: "var(--c-text)", outline: "none", boxSizing: "border-box" };
+const BP = { padding: "12px 18px", background: "var(--c-accent)", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 14, fontFamily: "'Helvetica Neue',sans-serif", fontWeight: 600, textAlign: "center" };
+const BS = { padding: "12px 18px", background: "transparent", color: "var(--c-subtext)", border: "2px solid var(--c-border)", borderRadius: 10, cursor: "pointer", fontSize: 14, fontFamily: "'Helvetica Neue',sans-serif", textAlign: "center" };
+const LT = { padding: 28, textAlign: "center", color: "var(--c-subtext)", fontFamily: "'Helvetica Neue',sans-serif" };
