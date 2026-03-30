@@ -441,9 +441,9 @@ function ProspeoApp({ profile, onSignOut, lang, changeLang }) {
 }
 
 function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, lang="fr", subscription=null, globalSearch="", setGlobalSearch, onSelect }) {
-  const [upcomingFollowups, setUpcomingFollowups] = React.useState([]);
+  const [upcomingFollowups, setUpcomingFollowups] = useState([]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!profile?.id) return;
     // Charger les relances S et S+1 (aujourd'hui + 14 jours)
     const today = new Date().toISOString().split("T")[0];
