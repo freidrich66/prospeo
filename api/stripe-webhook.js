@@ -171,17 +171,14 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── Renouvellement abonnement annuel ───────────────────────
-  if (event.type === "invoice.payment_succeeded") {
-    const invoice = event.data.object;
-    if (invoice.subscription) {
-      try {
-        const sub     = await stripe.subscriptions.retrieve(invoice.subscription);
-        const periodEnd = new Date(sub.current_period_end * 1000);
-        await supabase.from("subscriptions")
-          .update({ status: "active", current_period_end: periodEnd.toISOString() })
-          .eq("stripe_sub_id", invoice.subscription);
-      } catch (err) { console.error("Erreur renouvellement:", err.message); }
+  // ── Renouvellement / mise à jour abonnement ───────────────
+  if (event.type === "customer.subscription.updated") {
+    const sub = event.data.object;
+    if (sub.status === "active") {
+      const periodEnd = new Date(sub.current_period_end * 1000);
+      await supabase.from("subscriptions")
+        .update({ status: "active", current_period_end: periodEnd.toISOString() })
+        .eq("stripe_sub_id", sub.id);
     }
   }
 
