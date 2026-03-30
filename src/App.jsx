@@ -477,9 +477,8 @@ function DashboardView({ contacts, stats, loadingData, profile, isMobile, go, la
   const nextWeekF  = upcomingFollowups.filter(n => { const d=new Date(n.followup_date); return d>=monNext && d<=sunNext; });
 
   const FollowupRow = ({n, borderColor}) => (
-    <div key={n.id} style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"10px 0", borderBottom:`1px solid ${borderColor}` }}
-      onClick={()=>{ if(n.contacts?.id) onSelect({...n.contacts, id:n.contacts.id}); }}
-      style2={{ cursor: n.contacts?.id ? "pointer":"default" }}>
+    <div key={n.id} style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"10px 0", borderBottom:`1px solid ${borderColor}`, cursor: n.contacts?.id ? "pointer":"default" }}
+      onClick={()=>{ if(n.contacts?.id) onSelect({...n.contacts, id:n.contacts.id}); }}>
       {/* Avatar */}
       <div style={{ width:36, height:36, borderRadius:"50%", background:"#1A1A1A", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, fontFamily:"'Helvetica Neue',sans-serif", flexShrink:0 }}>
         {((n.contacts?.first_name||"?")[0]).toUpperCase()}
